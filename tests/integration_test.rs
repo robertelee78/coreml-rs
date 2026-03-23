@@ -170,6 +170,120 @@ mod inference {
 }
 
 #[cfg(target_vendor = "apple")]
+const MULTI_IO_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/test_multi_io.mlmodelc");
+
+#[cfg(target_vendor = "apple")]
+mod multi_io {
+    use super::MULTI_IO_PATH;
+    use coreml_rs::{BorrowedTensor, ComputeUnits, Model, OwnedTensor, DataType};
+
+    #[test]
+    fn predict_multi_input_multi_output() {
+        let model = Model::load(MULTI_IO_PATH, ComputeUnits::All).unwrap();
+
+        let float_data = vec![1.0f32, 2.0, 3.0, 4.0];
+        let float_tensor = BorrowedTensor::from_f32(&float_data, &[1, 4]).unwrap();
+
+        let int_data = vec![5.0f32, 10.0]; // model expects float even for "int_input"
+        let int_tensor = BorrowedTensor::from_f32(&int_data, &[1, 2]).unwrap();
+
+        let prediction = model.predict(&[
+            ("float_input", &float_tensor),
+            ("int_input", &int_tensor),
+        ]).unwrap();
+
+        // Extract BOTH outputs from same prediction
+        let (sum_out, sum_shape) = prediction.get_f32("sum_output").unwrap();
+        let (count_out, count_shape) = prediction.get_f32("count_output").unwrap();
+
+        assert_eq!(sum_shape, vec![1, 4]);
+        assert_eq!(count_shape, vec![1, 2]);
+
+        // sum_output = 2*float_input + 1
+        let expected_sum = vec![3.0f32, 5.0, 7.0, 9.0];
+        for (got, want) in sum_out.iter().zip(expected_sum.iter()) {
+            assert!((got - want).abs() < 0.1, "sum: got {got}, expected {want}");
+        }
+
+        // count_output = 2*int_input
+        let expected_count = vec![10.0f32, 20.0];
+        for (got, want) in count_out.iter().zip(expected_count.iter()) {
+            assert!((got - want).abs() < 0.5, "count: got {got}, expected {want}");
+        }
+    }
+
+    #[test]
+    fn predict_multi_output_into_buffers() {
+        let model = Model::load(MULTI_IO_PATH, ComputeUnits::All).unwrap();
+
+        let float_data = vec![1.0f32; 4];
+        let float_tensor = BorrowedTensor::from_f32(&float_data, &[1, 4]).unwrap();
+        let int_data = vec![3.0f32; 2];
+        let int_tensor = BorrowedTensor::from_f32(&int_data, &[1, 2]).unwrap();
+
+        let prediction = model.predict(&[
+            ("float_input", &float_tensor),
+            ("int_input", &int_tensor),
+        ]).unwrap();
+
+        // Use get_f32_into for zero-alloc extraction
+        let mut sum_buf = vec![0.0f32; 4];
+        let mut count_buf = vec![0.0f32; 2];
+
+        prediction.get_f32_into("sum_output", &mut sum_buf).unwrap();
+        prediction.get_f32_into("count_output", &mut count_buf).unwrap();
+
+        // 2*1+1 = 3
+        for v in &sum_buf {
+            assert!((v - 3.0).abs() < 0.1);
+        }
+        // 2*3 = 6
+        for v in &count_buf {
+            assert!((v - 6.0).abs() < 0.5);
+        }
+    }
+
+    #[test]
+    fn predict_with_owned_tensor() {
+        let model = Model::load(MULTI_IO_PATH, ComputeUnits::All).unwrap();
+
+        // Use OwnedTensor as input (decoder pattern: owns LSTM states)
+        let owned = OwnedTensor::zeros(DataType::Float32, &[1, 4]).unwrap();
+
+        let int_data = vec![1.0f32; 2];
+        let borrowed = BorrowedTensor::from_f32(&int_data, &[1, 2]).unwrap();
+
+        // Mix OwnedTensor and BorrowedTensor in same predict call
+        let prediction = model.predict(&[
+            ("float_input", &owned),
+            ("int_input", &borrowed),
+        ]).unwrap();
+
+        let (sum_out, _) = prediction.get_f32("sum_output").unwrap();
+        // 2*0+1 = 1
+        for v in &sum_out {
+            assert!((v - 1.0).abs() < 0.1, "expected ~1.0, got {v}");
+        }
+    }
+
+    #[test]
+    fn multi_io_model_introspection() {
+        let model = Model::load(MULTI_IO_PATH, ComputeUnits::All).unwrap();
+
+        let inputs = model.inputs();
+        assert_eq!(inputs.len(), 2);
+
+        let outputs = model.outputs();
+        assert_eq!(outputs.len(), 2);
+
+        // Verify output names exist
+        let output_names: Vec<&str> = outputs.iter().map(|o| o.name()).collect();
+        assert!(output_names.contains(&"sum_output"));
+        assert!(output_names.contains(&"count_output"));
+    }
+}
+
+#[cfg(target_vendor = "apple")]
 mod introspection {
     use super::MODEL_PATH;
     use coreml_rs::{ComputeUnits, DataType, FeatureType, Model};

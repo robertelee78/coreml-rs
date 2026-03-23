@@ -16,7 +16,7 @@ pub use compile::compile_model;
 pub use description::{FeatureDescription, FeatureType, ModelMetadata};
 pub use error::{Error, ErrorKind, Result};
 pub use state::State;
-pub use tensor::{BorrowedTensor, DataType, OwnedTensor};
+pub use tensor::{AsMultiArray, BorrowedTensor, DataType, OwnedTensor};
 
 /// Compute unit selection for CoreML model loading.
 ///
@@ -109,8 +109,11 @@ impl Model {
         { std::path::Path::new("") }
     }
 
+    /// Run a synchronous prediction with named input tensors.
+    ///
+    /// Accepts any type implementing `AsMultiArray` (both `BorrowedTensor` and `OwnedTensor`).
     #[cfg(target_vendor = "apple")]
-    pub fn predict(&self, inputs: &[(&str, &BorrowedTensor<'_>)]) -> Result<Prediction> {
+    pub fn predict(&self, inputs: &[(&str, &dyn AsMultiArray)]) -> Result<Prediction> {
         use objc2::AnyThread;
         use objc2_core_ml::{MLDictionaryFeatureProvider, MLFeatureProvider, MLFeatureValue};
         use objc2_foundation::{NSDictionary, NSString};
@@ -121,7 +124,7 @@ impl Model {
 
             for &(name, tensor) in inputs {
                 keys.push(ffi::str_to_nsstring(name));
-                vals.push(unsafe { MLFeatureValue::featureValueWithMultiArray(&tensor.inner) });
+                vals.push(unsafe { MLFeatureValue::featureValueWithMultiArray(tensor.as_ml_multi_array()) });
             }
 
             let key_refs: Vec<&NSString> = keys.iter().map(|k| &**k).collect();
@@ -153,7 +156,7 @@ impl Model {
     }
 
     #[cfg(not(target_vendor = "apple"))]
-    pub fn predict(&self, _inputs: &[(&str, &BorrowedTensor<'_>)]) -> Result<Prediction> {
+    pub fn predict(&self, _inputs: &[(&str, &dyn AsMultiArray)]) -> Result<Prediction> {
         Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
     }
 
@@ -196,7 +199,7 @@ impl Model {
     #[cfg(target_vendor = "apple")]
     pub fn predict_stateful(
         &self,
-        inputs: &[(&str, &BorrowedTensor<'_>)],
+        inputs: &[(&str, &dyn AsMultiArray)],
         state: &State,
     ) -> Result<Prediction> {
         use objc2::AnyThread;
@@ -209,7 +212,7 @@ impl Model {
 
             for &(name, tensor) in inputs {
                 keys.push(ffi::str_to_nsstring(name));
-                vals.push(unsafe { MLFeatureValue::featureValueWithMultiArray(&tensor.inner) });
+                vals.push(unsafe { MLFeatureValue::featureValueWithMultiArray(tensor.as_ml_multi_array()) });
             }
 
             let key_refs: Vec<&NSString> = keys.iter().map(|k| &**k).collect();
@@ -242,7 +245,7 @@ impl Model {
     #[cfg(not(target_vendor = "apple"))]
     pub fn predict_stateful(
         &self,
-        _inputs: &[(&str, &BorrowedTensor<'_>)],
+        _inputs: &[(&str, &dyn AsMultiArray)],
         _state: &State,
     ) -> Result<Prediction> {
         Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
@@ -274,6 +277,8 @@ pub struct Prediction {
 // Safe to move to another thread for output extraction.
 #[cfg(target_vendor = "apple")]
 unsafe impl Send for Prediction {}
+#[cfg(target_vendor = "apple")]
+unsafe impl Sync for Prediction {}
 
 impl Prediction {
     /// Get an output as (Vec<f32>, shape), converting from the model's native data type.

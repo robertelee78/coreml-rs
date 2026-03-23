@@ -1,0 +1,16 @@
+program(1.0)
+[buildInfo = dict<tensor<string, []>, tensor<string, []>>({{"coremlc-component-MIL", "3510.2.1"}, {"coremlc-version", "3500.32.1"}, {"coremltools-component-torch", "2.11.0"}, {"coremltools-source-dialect", "TorchScript"}, {"coremltools-version", "9.0"}})]
+{
+    func main<ios16>(tensor<fp32, [1, 4]> float_input, tensor<fp32, [1, 2]> int_input) {
+            tensor<string, []> float_input_to_fp16_dtype_0 = const()[name = tensor<string, []>("float_input_to_fp16_dtype_0"), val = tensor<string, []>("fp16")];
+            tensor<fp16, []> var_3_to_fp16 = const()[name = tensor<string, []>("op_3_to_fp16"), val = tensor<fp16, []>(0x1p+1)];
+            tensor<fp16, [1, 4]> float_input_to_fp16 = cast(dtype = float_input_to_fp16_dtype_0, x = float_input)[name = tensor<string, []>("cast_3")];
+            tensor<fp16, [1, 4]> var_4_cast_fp16 = mul(x = float_input_to_fp16, y = var_3_to_fp16)[name = tensor<string, []>("op_4_cast_fp16")];
+            tensor<fp16, []> var_6_to_fp16 = const()[name = tensor<string, []>("op_6_to_fp16"), val = tensor<fp16, []>(0x1p+0)];
+            tensor<fp16, [1, 4]> sum_output = add(x = var_4_cast_fp16, y = var_6_to_fp16)[name = tensor<string, []>("op_7_cast_fp16")];
+            tensor<string, []> int_input_to_fp16_dtype_0 = const()[name = tensor<string, []>("int_input_to_fp16_dtype_0"), val = tensor<string, []>("fp16")];
+            tensor<fp16, []> var_13_to_fp16 = const()[name = tensor<string, []>("op_13_to_fp16"), val = tensor<fp16, []>(0x1p+1)];
+            tensor<fp16, [1, 2]> int_input_to_fp16 = cast(dtype = int_input_to_fp16_dtype_0, x = int_input)[name = tensor<string, []>("cast_2")];
+            tensor<fp16, [1, 2]> count_output = mul(x = int_input_to_fp16, y = var_13_to_fp16)[name = tensor<string, []>("op_14_cast_fp16")];
+        } -> (sum_output, count_output);
+}

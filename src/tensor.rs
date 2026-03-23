@@ -271,6 +271,37 @@ mod platform {
 
 pub use platform::{BorrowedTensor, OwnedTensor};
 
+/// Trait for types that can be used as prediction inputs.
+///
+/// Implemented by both `BorrowedTensor` and `OwnedTensor`.
+#[cfg(target_vendor = "apple")]
+pub trait AsMultiArray {
+    fn as_ml_multi_array(&self) -> &objc2::rc::Retained<objc2_core_ml::MLMultiArray>;
+}
+
+#[cfg(target_vendor = "apple")]
+impl AsMultiArray for BorrowedTensor<'_> {
+    fn as_ml_multi_array(&self) -> &objc2::rc::Retained<objc2_core_ml::MLMultiArray> {
+        &self.inner
+    }
+}
+
+#[cfg(target_vendor = "apple")]
+impl AsMultiArray for OwnedTensor {
+    fn as_ml_multi_array(&self) -> &objc2::rc::Retained<objc2_core_ml::MLMultiArray> {
+        &self.inner
+    }
+}
+
+#[cfg(not(target_vendor = "apple"))]
+pub trait AsMultiArray {}
+
+#[cfg(not(target_vendor = "apple"))]
+impl AsMultiArray for BorrowedTensor<'_> {}
+
+#[cfg(not(target_vendor = "apple"))]
+impl AsMultiArray for OwnedTensor {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
