@@ -5,13 +5,17 @@
 //! Requires macOS or iOS. On non-Apple targets, types exist as stubs
 //! returning `Error::UnsupportedPlatform`.
 
+pub mod compile;
 pub mod description;
 pub mod error;
 pub(crate) mod ffi;
+pub mod state;
 pub mod tensor;
 
+pub use compile::compile_model;
 pub use description::{FeatureDescription, FeatureType, ModelMetadata};
 pub use error::{Error, ErrorKind, Result};
+pub use state::State;
 pub use tensor::{BorrowedTensor, DataType, OwnedTensor};
 
 /// Compute unit selection for CoreML model loading.
@@ -162,6 +166,76 @@ impl Model {
     pub fn metadata(&self) -> ModelMetadata {
         let desc = unsafe { self.inner.modelDescription() };
         description::extract_metadata(&desc)
+    }
+
+    /// Create a new state for stateful prediction (macOS 15+ / iOS 18+).
+    #[cfg(target_vendor = "apple")]
+    pub fn new_state(&self) -> Result<State> {
+        let inner = unsafe { self.inner.newState() };
+        Ok(State { inner })
+    }
+
+    #[cfg(not(target_vendor = "apple"))]
+    pub fn new_state(&self) -> Result<State> {
+        Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+    }
+
+    /// Run prediction with persistent state (macOS 15+ / iOS 18+).
+    ///
+    /// The state is mutated in-place by CoreML.
+    #[cfg(target_vendor = "apple")]
+    pub fn predict_stateful(
+        &self,
+        inputs: &[(&str, &BorrowedTensor<'_>)],
+        state: &State,
+    ) -> Result<Prediction> {
+        use objc2::AnyThread;
+        use objc2_core_ml::{MLDictionaryFeatureProvider, MLFeatureProvider, MLFeatureValue};
+        use objc2_foundation::{NSDictionary, NSString};
+
+        objc2::rc::autoreleasepool(|_pool| {
+            let mut keys: Vec<objc2::rc::Retained<NSString>> = Vec::with_capacity(inputs.len());
+            let mut vals: Vec<objc2::rc::Retained<MLFeatureValue>> = Vec::with_capacity(inputs.len());
+
+            for &(name, tensor) in inputs {
+                keys.push(ffi::str_to_nsstring(name));
+                vals.push(unsafe { MLFeatureValue::featureValueWithMultiArray(&tensor.inner) });
+            }
+
+            let key_refs: Vec<&NSString> = keys.iter().map(|k| &**k).collect();
+            let val_refs: Vec<&MLFeatureValue> = vals.iter().map(|v| &**v).collect();
+            let dict: objc2::rc::Retained<NSDictionary<NSString, MLFeatureValue>> =
+                NSDictionary::from_slices(&key_refs, &val_refs);
+            let dict_any: &NSDictionary<NSString, objc2::runtime::AnyObject> =
+                unsafe { &*((&*dict) as *const NSDictionary<NSString, MLFeatureValue>
+                    as *const NSDictionary<NSString, objc2::runtime::AnyObject>) };
+
+            let provider = unsafe {
+                MLDictionaryFeatureProvider::initWithDictionary_error(
+                    MLDictionaryFeatureProvider::alloc(), dict_any,
+                )
+            }
+            .map_err(|e| Error::from_nserror(ErrorKind::Prediction, &e))?;
+
+            let provider_ref: &objc2::runtime::ProtocolObject<dyn MLFeatureProvider> =
+                objc2::runtime::ProtocolObject::from_ref(&*provider);
+
+            let result = unsafe {
+                self.inner.predictionFromFeatures_usingState_error(provider_ref, &state.inner)
+            }
+            .map_err(|e| Error::from_nserror(ErrorKind::Prediction, &e))?;
+
+            Ok(Prediction { inner: result })
+        })
+    }
+
+    #[cfg(not(target_vendor = "apple"))]
+    pub fn predict_stateful(
+        &self,
+        _inputs: &[(&str, &BorrowedTensor<'_>)],
+        _state: &State,
+    ) -> Result<Prediction> {
+        Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
     }
 
     #[cfg(not(target_vendor = "apple"))]
