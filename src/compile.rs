@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 /// The compiled model is placed in a temporary directory by CoreML;
 /// you should copy it to a permanent location.
 #[cfg(target_vendor = "apple")]
+#[allow(deprecated)] // sync API is deprecated but async requires run loop
 pub fn compile_model(source: impl AsRef<Path>) -> Result<PathBuf> {
     use objc2_core_ml::MLModel;
 
@@ -26,7 +27,7 @@ pub fn compile_model(source: impl AsRef<Path>) -> Result<PathBuf> {
     let compiled_url = unsafe { MLModel::compileModelAtURL_error(&url) }
         .map_err(|e| Error::from_nserror(ErrorKind::ModelLoad, &e))?;
 
-    let compiled_path = unsafe { compiled_url.path() }
+    let compiled_path = compiled_url.path()
         .ok_or_else(|| Error::new(ErrorKind::ModelLoad, "compiled URL has no path"))?;
 
     Ok(PathBuf::from(compiled_path.to_string()))
