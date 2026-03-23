@@ -19,11 +19,16 @@ pub use state::State;
 pub use tensor::{BorrowedTensor, DataType, OwnedTensor};
 
 /// Compute unit selection for CoreML model loading.
+///
+/// Default is `All` — uses CPU, GPU (Metal), and Apple Neural Engine
+/// for maximum throughput. This is the whole point of native CoreML.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ComputeUnits {
-    CpuOnly,
+    /// CPU + GPU (Metal) — no ANE.
     CpuAndGpu,
+    /// CPU + Apple Neural Engine — no GPU.
     CpuAndNeuralEngine,
+    /// All available: CPU + GPU + ANE. **Use this.**
     #[default]
     All,
 }
@@ -31,7 +36,6 @@ pub enum ComputeUnits {
 impl std::fmt::Display for ComputeUnits {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::CpuOnly => write!(f, "CPU Only"),
             Self::CpuAndGpu => write!(f, "CPU + GPU"),
             Self::CpuAndNeuralEngine => write!(f, "CPU + Neural Engine"),
             Self::All => write!(f, "All (CPU + GPU + ANE)"),
@@ -74,7 +78,6 @@ impl Model {
         let url = objc2_foundation::NSURL::fileURLWithPath(&ffi::str_to_nsstring(path_str));
         let config = unsafe { MLModelConfiguration::new() };
         let ml_units = match compute_units {
-            ComputeUnits::CpuOnly => MLComputeUnits::CPUOnly,
             ComputeUnits::CpuAndGpu => MLComputeUnits::CPUAndGPU,
             ComputeUnits::CpuAndNeuralEngine => MLComputeUnits(2),
             ComputeUnits::All => MLComputeUnits::All,
@@ -379,7 +382,7 @@ mod tests {
 
     #[test]
     fn compute_units_display() {
-        assert_eq!(format!("{}", ComputeUnits::CpuOnly), "CPU Only");
+        assert_eq!(format!("{}", ComputeUnits::CpuAndGpu), "CPU + GPU");
         assert_eq!(format!("{}", ComputeUnits::All), "All (CPU + GPU + ANE)");
     }
 

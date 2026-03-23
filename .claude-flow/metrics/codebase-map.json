@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-03-23T21:52:41.790Z",
+  "projectRoot": "/opt/coreml-crate",
+  "structure": {
+    "hasPackageJson": false,
+    "hasTsConfig": false,
+    "hasClaudeConfig": true,
+    "hasClaudeFlow": true
+  },
+  "scannedAt": 1774302761790
+}

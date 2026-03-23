@@ -10,7 +10,7 @@ fn main() {
         .unwrap_or_else(|| "tests/fixtures/test_linear.mlmodelc".to_string());
 
     println!("Loading model: {model_path}");
-    let model = Model::load(&model_path, ComputeUnits::CpuOnly).expect("Failed to load model");
+    let model = Model::load(&model_path, ComputeUnits::All).expect("Failed to load model");
 
     println!("\n--- Inputs ---");
     for desc in model.inputs() {

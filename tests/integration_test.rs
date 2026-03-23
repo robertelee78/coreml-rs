@@ -109,8 +109,8 @@ mod inference {
     }
 
     #[test]
-    fn predict_cpu_only() {
-        let model = Model::load(MODEL_PATH, ComputeUnits::CpuOnly).unwrap();
+    fn predict_gpu_ane_accelerated() {
+        let model = Model::load(MODEL_PATH, ComputeUnits::All).unwrap();
 
         let input_data = vec![1.0f32, 2.0, 3.0, 4.0];
         let tensor = BorrowedTensor::from_f32(&input_data, &[1, 4]).unwrap();
@@ -131,7 +131,7 @@ mod introspection {
 
     #[test]
     fn input_descriptions() {
-        let model = Model::load(MODEL_PATH, ComputeUnits::CpuOnly).unwrap();
+        let model = Model::load(MODEL_PATH, ComputeUnits::All).unwrap();
 
         let inputs = model.inputs();
         assert_eq!(inputs.len(), 1);
@@ -144,7 +144,7 @@ mod introspection {
 
     #[test]
     fn output_descriptions() {
-        let model = Model::load(MODEL_PATH, ComputeUnits::CpuOnly).unwrap();
+        let model = Model::load(MODEL_PATH, ComputeUnits::All).unwrap();
 
         let outputs = model.outputs();
         assert_eq!(outputs.len(), 1);
@@ -155,7 +155,7 @@ mod introspection {
 
     #[test]
     fn input_data_type_is_float() {
-        let model = Model::load(MODEL_PATH, ComputeUnits::CpuOnly).unwrap();
+        let model = Model::load(MODEL_PATH, ComputeUnits::All).unwrap();
 
         let inputs = model.inputs();
         let dt = inputs[0].data_type().unwrap();
@@ -168,7 +168,7 @@ mod introspection {
 
     #[test]
     fn metadata_is_accessible() {
-        let model = Model::load(MODEL_PATH, ComputeUnits::CpuOnly).unwrap();
+        let model = Model::load(MODEL_PATH, ComputeUnits::All).unwrap();
         let meta = model.metadata();
         // Metadata exists (may be empty strings for test model)
         let _ = meta.author;
