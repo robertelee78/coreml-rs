@@ -43,12 +43,11 @@ impl std::fmt::Display for ComputeUnits {
     }
 }
 
-// ─── Model (Apple) ──────────────────────────────────────────────────────────
+// ─── Model ──────────────────────────────────────────────────────────────────
 
 #[cfg(target_vendor = "apple")]
 pub struct Model {
     inner: objc2::rc::Retained<objc2_core_ml::MLModel>,
-    #[allow(dead_code)]
     path: std::path::PathBuf,
 }
 
@@ -64,6 +63,13 @@ impl std::fmt::Debug for Model {
 pub struct Model {
     _private: (),
 }
+
+// Apple documents MLModel.predictionFromFeatures as thread-safe for
+// concurrent read-only predictions on the same model instance.
+#[cfg(target_vendor = "apple")]
+unsafe impl Send for Model {}
+#[cfg(target_vendor = "apple")]
+unsafe impl Sync for Model {}
 
 impl Model {
     #[cfg(target_vendor = "apple")]
@@ -95,6 +101,14 @@ impl Model {
         Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
     }
 
+    /// The filesystem path this model was loaded from.
+    pub fn path(&self) -> &std::path::Path {
+        #[cfg(target_vendor = "apple")]
+        { &self.path }
+        #[cfg(not(target_vendor = "apple"))]
+        { std::path::Path::new("") }
+    }
+
     #[cfg(target_vendor = "apple")]
     pub fn predict(&self, inputs: &[(&str, &BorrowedTensor<'_>)]) -> Result<Prediction> {
         use objc2::AnyThread;
@@ -102,7 +116,6 @@ impl Model {
         use objc2_foundation::{NSDictionary, NSString};
 
         objc2::rc::autoreleasepool(|_pool| {
-            // Build NSDictionary<NSString, MLFeatureValue>
             let mut keys: Vec<objc2::rc::Retained<NSString>> = Vec::with_capacity(inputs.len());
             let mut vals: Vec<objc2::rc::Retained<MLFeatureValue>> = Vec::with_capacity(inputs.len());
 
@@ -114,12 +127,9 @@ impl Model {
             let key_refs: Vec<&NSString> = keys.iter().map(|k| &**k).collect();
             let val_refs: Vec<&MLFeatureValue> = vals.iter().map(|v| &**v).collect();
 
-            // Create NSDictionary manually via from_retained_slice or from_slices
             let dict: objc2::rc::Retained<NSDictionary<NSString, MLFeatureValue>> =
                 NSDictionary::from_slices(&key_refs, &val_refs);
 
-            // MLDictionaryFeatureProvider expects NSDictionary<NSString, AnyObject>
-            // We need to cast. MLFeatureValue is an NSObject subclass.
             let dict_any: &NSDictionary<NSString, objc2::runtime::AnyObject> =
                 unsafe { &*((&*dict) as *const NSDictionary<NSString, MLFeatureValue>
                     as *const NSDictionary<NSString, objc2::runtime::AnyObject>) };
@@ -132,7 +142,6 @@ impl Model {
             }
             .map_err(|e| Error::from_nserror(ErrorKind::Prediction, &e))?;
 
-            // Cast to protocol object for prediction
             let provider_ref: &objc2::runtime::ProtocolObject<dyn MLFeatureProvider> =
                 objc2::runtime::ProtocolObject::from_ref(&*provider);
 
@@ -184,8 +193,6 @@ impl Model {
     }
 
     /// Run prediction with persistent state (macOS 15+ / iOS 18+).
-    ///
-    /// The state is mutated in-place by CoreML.
     #[cfg(target_vendor = "apple")]
     pub fn predict_stateful(
         &self,
@@ -251,9 +258,6 @@ impl Model {
     pub fn metadata(&self) -> ModelMetadata { ModelMetadata::default() }
 }
 
-#[cfg(target_vendor = "apple")]
-unsafe impl Send for Model {}
-
 // ─── Prediction result ──────────────────────────────────────────────────────
 
 #[cfg(target_vendor = "apple")]
@@ -266,11 +270,55 @@ pub struct Prediction {
     _private: (),
 }
 
+// The Prediction holds a Retained MLFeatureProvider which is reference-counted.
+// Safe to move to another thread for output extraction.
+#[cfg(target_vendor = "apple")]
+unsafe impl Send for Prediction {}
+
 impl Prediction {
     /// Get an output as (Vec<f32>, shape), converting from the model's native data type.
+    /// Allocates a new Vec for the output data.
     #[cfg(target_vendor = "apple")]
     #[allow(deprecated)]
     pub fn get_f32(&self, name: &str) -> Result<(Vec<f32>, Vec<usize>)> {
+        objc2::rc::autoreleasepool(|_pool| {
+            let (count, shape, data_type, array) = self.get_output_array(name)?;
+            let mut buf = vec![0.0f32; count];
+            Self::copy_array_to_f32(&array, data_type, count, &mut buf)?;
+            Ok((buf, shape))
+        })
+    }
+
+    /// Copy an output into a caller-provided f32 buffer (zero-alloc hot path).
+    ///
+    /// Returns the shape. The buffer must be large enough to hold all elements.
+    #[cfg(target_vendor = "apple")]
+    #[allow(deprecated)]
+    pub fn get_f32_into(&self, name: &str, buf: &mut [f32]) -> Result<Vec<usize>> {
+        objc2::rc::autoreleasepool(|_pool| {
+            let (count, shape, data_type, array) = self.get_output_array(name)?;
+            if buf.len() < count {
+                return Err(Error::new(
+                    ErrorKind::InvalidShape,
+                    format!("buffer length {} < output element count {count}", buf.len()),
+                ));
+            }
+            Self::copy_array_to_f32(&array, data_type, count, buf)?;
+            Ok(shape)
+        })
+    }
+
+    #[cfg(target_vendor = "apple")]
+    #[allow(deprecated)]
+    fn get_output_array(
+        &self,
+        name: &str,
+    ) -> Result<(
+        usize,
+        Vec<usize>,
+        Option<DataType>,
+        objc2::rc::Retained<objc2_core_ml::MLMultiArray>,
+    )> {
         use objc2_core_ml::MLFeatureProvider;
 
         let ns_name = ffi::str_to_nsstring(name);
@@ -287,8 +335,17 @@ impl Prediction {
         let dt_raw = unsafe { array.dataType() };
         let data_type = ffi::ml_to_datatype(dt_raw.0);
 
-        let mut buf = vec![0.0f32; count];
+        Ok((count, shape, data_type, array))
+    }
 
+    #[cfg(target_vendor = "apple")]
+    #[allow(deprecated)]
+    fn copy_array_to_f32(
+        array: &objc2_core_ml::MLMultiArray,
+        data_type: Option<DataType>,
+        count: usize,
+        buf: &mut [f32],
+    ) -> Result<()> {
         unsafe {
             let ptr = array.dataPointer();
             match data_type {
@@ -297,11 +354,9 @@ impl Prediction {
                     std::ptr::copy_nonoverlapping(src, buf.as_mut_ptr(), count);
                 }
                 Some(DataType::Float16) => {
-                    // Convert f16 to f32
                     let src = ptr.as_ptr() as *const u16;
                     for i in 0..count {
-                        let bits = *src.add(i);
-                        buf[i] = f16_to_f32(bits);
+                        buf[i] = f16_to_f32(*src.add(i));
                     }
                 }
                 Some(DataType::Float64) => {
@@ -319,17 +374,21 @@ impl Prediction {
                 None => {
                     return Err(Error::new(
                         ErrorKind::Prediction,
-                        format!("unsupported output data type for '{name}'"),
+                        "unsupported output data type",
                     ));
                 }
             }
         }
-
-        Ok((buf, shape))
+        Ok(())
     }
 
     #[cfg(not(target_vendor = "apple"))]
     pub fn get_f32(&self, _name: &str) -> Result<(Vec<f32>, Vec<usize>)> {
+        Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+    }
+
+    #[cfg(not(target_vendor = "apple"))]
+    pub fn get_f32_into(&self, _name: &str, _buf: &mut [f32]) -> Result<Vec<usize>> {
         Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
     }
 }
@@ -343,10 +402,8 @@ fn f16_to_f32(bits: u16) -> f32 {
 
     if exp == 0 {
         if frac == 0 {
-            // Zero
             f32::from_bits(sign << 31)
         } else {
-            // Subnormal: normalize
             let mut e = 0i32;
             let mut f = frac;
             while (f & 0x400) == 0 {
@@ -358,14 +415,12 @@ fn f16_to_f32(bits: u16) -> f32 {
             f32::from_bits((sign << 31) | (exp32 << 23) | (f << 13))
         }
     } else if exp == 31 {
-        // Inf or NaN
         if frac == 0 {
             f32::from_bits((sign << 31) | (0xff << 23))
         } else {
             f32::from_bits((sign << 31) | (0xff << 23) | (frac << 13))
         }
     } else {
-        // Normal
         let exp32 = exp + (127 - 15);
         f32::from_bits((sign << 31) | (exp32 << 23) | (frac << 13))
     }

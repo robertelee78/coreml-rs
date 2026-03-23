@@ -109,6 +109,51 @@ mod inference {
     }
 
     #[test]
+    fn predict_get_f32_into_buffer_reuse() {
+        let model = Model::load(MODEL_PATH, ComputeUnits::All).unwrap();
+
+        let mut output_buf = vec![0.0f32; 4];
+
+        for i in 0..5 {
+            let val = i as f32;
+            let input_data = vec![val; 4];
+            let tensor = BorrowedTensor::from_f32(&input_data, &[1, 4]).unwrap();
+            let prediction = model.predict(&[("input", &tensor)]).unwrap();
+
+            let shape = prediction.get_f32_into("output", &mut output_buf).unwrap();
+            assert_eq!(shape, vec![1, 4]);
+
+            let expected = 2.0 * val + 1.0;
+            for got in &output_buf {
+                assert!(
+                    (got - expected).abs() < expected.abs() * 0.01 + 0.1,
+                    "iteration {i}: got {got}, expected {expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn predict_get_f32_into_short_buffer_fails() {
+        let model = Model::load(MODEL_PATH, ComputeUnits::All).unwrap();
+
+        let input_data = vec![1.0f32; 4];
+        let tensor = BorrowedTensor::from_f32(&input_data, &[1, 4]).unwrap();
+        let prediction = model.predict(&[("input", &tensor)]).unwrap();
+
+        let mut short_buf = vec![0.0f32; 2];
+        let err = prediction.get_f32_into("output", &mut short_buf).unwrap_err();
+        assert_eq!(err.kind(), &coreml_rs::ErrorKind::InvalidShape);
+    }
+
+    #[test]
+    fn model_path_accessor() {
+        let model = Model::load(MODEL_PATH, ComputeUnits::All).unwrap();
+        let path = model.path();
+        assert!(path.to_str().unwrap().contains("test_linear.mlmodelc"));
+    }
+
+    #[test]
     fn predict_gpu_ane_accelerated() {
         let model = Model::load(MODEL_PATH, ComputeUnits::All).unwrap();
 
