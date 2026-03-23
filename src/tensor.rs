@@ -144,6 +144,48 @@ mod platform {
             Ok(Self { inner, shape: shape.to_vec(), data_type: DataType::Int32, _marker: std::marker::PhantomData })
         }
 
+        pub fn from_f64(data: &'a [f64], shape: &[usize]) -> Result<Self> {
+            validate_shape(data.len(), shape)?;
+            let ns_shape = ffi::shape_to_nsarray(shape);
+            let strides = compute_strides(shape);
+            let ns_strides = ffi::shape_to_nsarray(&strides);
+            let ml_dtype = objc2_core_ml::MLMultiArrayDataType(ffi::datatype_to_ml(DataType::Float64));
+
+            let ptr = NonNull::new(data.as_ptr() as *mut c_void).ok_or_else(|| {
+                Error::new(ErrorKind::TensorCreate, "null data pointer")
+            })?;
+
+            let inner = unsafe {
+                MLMultiArray::initWithDataPointer_shape_dataType_strides_deallocator_error(
+                    MLMultiArray::alloc(), ptr, &ns_shape, ml_dtype, &ns_strides, None,
+                )
+            }
+            .map_err(|e| Error::from_nserror(ErrorKind::TensorCreate, &e))?;
+
+            Ok(Self { inner, shape: shape.to_vec(), data_type: DataType::Float64, _marker: std::marker::PhantomData })
+        }
+
+        pub fn from_f16_bits(data: &'a [u16], shape: &[usize]) -> Result<Self> {
+            validate_shape(data.len(), shape)?;
+            let ns_shape = ffi::shape_to_nsarray(shape);
+            let strides = compute_strides(shape);
+            let ns_strides = ffi::shape_to_nsarray(&strides);
+            let ml_dtype = objc2_core_ml::MLMultiArrayDataType(ffi::datatype_to_ml(DataType::Float16));
+
+            let ptr = NonNull::new(data.as_ptr() as *mut c_void).ok_or_else(|| {
+                Error::new(ErrorKind::TensorCreate, "null data pointer")
+            })?;
+
+            let inner = unsafe {
+                MLMultiArray::initWithDataPointer_shape_dataType_strides_deallocator_error(
+                    MLMultiArray::alloc(), ptr, &ns_shape, ml_dtype, &ns_strides, None,
+                )
+            }
+            .map_err(|e| Error::from_nserror(ErrorKind::TensorCreate, &e))?;
+
+            Ok(Self { inner, shape: shape.to_vec(), data_type: DataType::Float16, _marker: std::marker::PhantomData })
+        }
+
         pub fn shape(&self) -> &[usize] { &self.shape }
         pub fn data_type(&self) -> DataType { self.data_type }
         pub fn element_count(&self) -> usize { element_count(&self.shape) }
@@ -214,6 +256,69 @@ mod platform {
             self.copy_to_f32(&mut buf)?;
             Ok(buf)
         }
+
+        /// Copy output data as i32 values.
+        #[allow(deprecated)]
+        pub fn copy_to_i32(&self, buf: &mut [i32]) -> Result<()> {
+            if self.data_type != DataType::Int32 {
+                return Err(Error::new(ErrorKind::TensorCreate, format!("tensor is {:?}, not Int32", self.data_type)));
+            }
+            let count = self.element_count();
+            if buf.len() < count {
+                return Err(Error::new(ErrorKind::InvalidShape, format!("buffer length {} < element count {count}", buf.len())));
+            }
+            unsafe {
+                let ptr = self.inner.dataPointer();
+                let src = ptr.as_ptr() as *const i32;
+                std::ptr::copy_nonoverlapping(src, buf.as_mut_ptr(), count);
+            }
+            Ok(())
+        }
+
+        /// Convert to Vec<i32>.
+        pub fn to_vec_i32(&self) -> Result<Vec<i32>> {
+            let mut buf = vec![0i32; self.element_count()];
+            self.copy_to_i32(&mut buf)?;
+            Ok(buf)
+        }
+
+        /// Copy output data as f64 values.
+        #[allow(deprecated)]
+        pub fn copy_to_f64(&self, buf: &mut [f64]) -> Result<()> {
+            if self.data_type != DataType::Float64 {
+                return Err(Error::new(ErrorKind::TensorCreate, format!("tensor is {:?}, not Float64", self.data_type)));
+            }
+            let count = self.element_count();
+            if buf.len() < count {
+                return Err(Error::new(ErrorKind::InvalidShape, format!("buffer length {} < element count {count}", buf.len())));
+            }
+            unsafe {
+                let ptr = self.inner.dataPointer();
+                let src = ptr.as_ptr() as *const f64;
+                std::ptr::copy_nonoverlapping(src, buf.as_mut_ptr(), count);
+            }
+            Ok(())
+        }
+
+        /// Convert to Vec<f64>.
+        pub fn to_vec_f64(&self) -> Result<Vec<f64>> {
+            let mut buf = vec![0.0f64; self.element_count()];
+            self.copy_to_f64(&mut buf)?;
+            Ok(buf)
+        }
+
+        /// Returns a Vec<u8> copy of the raw data.
+        #[allow(deprecated)]
+        pub fn to_raw_bytes(&self) -> Result<Vec<u8>> {
+            let byte_count = self.element_count() * self.data_type.byte_size();
+            let mut buf = vec![0u8; byte_count];
+            unsafe {
+                let ptr = self.inner.dataPointer();
+                let src = ptr.as_ptr() as *const u8;
+                std::ptr::copy_nonoverlapping(src, buf.as_mut_ptr(), byte_count);
+            }
+            Ok(buf)
+        }
     }
 
     unsafe impl Send for OwnedTensor {}
@@ -238,6 +343,14 @@ mod platform {
             Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
         }
         pub fn from_i32(_data: &'a [i32], shape: &[usize]) -> Result<Self> {
+            validate_shape(_data.len(), shape)?;
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn from_f64(_data: &'a [f64], shape: &[usize]) -> Result<Self> {
+            validate_shape(_data.len(), shape)?;
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn from_f16_bits(_data: &'a [u16], shape: &[usize]) -> Result<Self> {
             validate_shape(_data.len(), shape)?;
             Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
         }
@@ -268,6 +381,21 @@ mod platform {
             Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
         }
         pub fn to_vec_f32(&self) -> Result<Vec<f32>> {
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn copy_to_i32(&self, _buf: &mut [i32]) -> Result<()> {
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn to_vec_i32(&self) -> Result<Vec<i32>> {
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn copy_to_f64(&self, _buf: &mut [f64]) -> Result<()> {
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn to_vec_f64(&self) -> Result<Vec<f64>> {
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn to_raw_bytes(&self) -> Result<Vec<u8>> {
             Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
         }
     }
@@ -404,6 +532,35 @@ mod tests {
             let tensor = OwnedTensor::zeros(DataType::Int32, &[4]).unwrap();
             let mut buf = vec![0.0f32; 4];
             assert!(tensor.copy_to_f32(&mut buf).is_err());
+        }
+
+        #[test]
+        fn borrowed_tensor_from_f64() {
+            let data = vec![1.0f64; 6];
+            let tensor = BorrowedTensor::from_f64(&data, &[2, 3]).unwrap();
+            assert_eq!(tensor.data_type(), DataType::Float64);
+        }
+
+        #[test]
+        fn borrowed_tensor_from_f16_bits() {
+            // f16 representation of 1.0 is 0x3C00
+            let data = vec![0x3C00u16; 4];
+            let tensor = BorrowedTensor::from_f16_bits(&data, &[2, 2]).unwrap();
+            assert_eq!(tensor.data_type(), DataType::Float16);
+        }
+
+        #[test]
+        fn owned_tensor_i32_roundtrip() {
+            let tensor = OwnedTensor::zeros(DataType::Int32, &[4]).unwrap();
+            let data = tensor.to_vec_i32().unwrap();
+            assert_eq!(data, vec![0i32; 4]);
+        }
+
+        #[test]
+        fn owned_tensor_raw_bytes() {
+            let tensor = OwnedTensor::zeros(DataType::Float32, &[2]).unwrap();
+            let bytes = tensor.to_raw_bytes().unwrap();
+            assert_eq!(bytes.len(), 8); // 2 elements * 4 bytes
         }
     }
 }

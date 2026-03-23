@@ -11,9 +11,13 @@ pub mod error;
 pub(crate) mod ffi;
 pub mod state;
 pub mod tensor;
+pub mod batch;
+pub mod compute;
 
+pub use batch::{BatchPrediction, BatchProvider};
 pub use compile::compile_model;
-pub use description::{FeatureDescription, FeatureType, ModelMetadata};
+pub use compute::{available_devices, ComputeDevice};
+pub use description::{FeatureDescription, FeatureType, ModelMetadata, ShapeConstraint};
 pub use error::{Error, ErrorKind, Result};
 pub use state::State;
 pub use tensor::{AsMultiArray, BorrowedTensor, DataType, OwnedTensor};
@@ -24,6 +28,8 @@ pub use tensor::{AsMultiArray, BorrowedTensor, DataType, OwnedTensor};
 /// for maximum throughput. This is the whole point of native CoreML.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ComputeUnits {
+    /// CPU only — no GPU or ANE.
+    CpuOnly,
     /// CPU + GPU (Metal) — no ANE.
     CpuAndGpu,
     /// CPU + Apple Neural Engine — no GPU.
@@ -36,6 +42,7 @@ pub enum ComputeUnits {
 impl std::fmt::Display for ComputeUnits {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::CpuOnly => write!(f, "CPU only"),
             Self::CpuAndGpu => write!(f, "CPU + GPU"),
             Self::CpuAndNeuralEngine => write!(f, "CPU + Neural Engine"),
             Self::All => write!(f, "All (CPU + GPU + ANE)"),
@@ -84,6 +91,7 @@ impl Model {
         let url = objc2_foundation::NSURL::fileURLWithPath(&ffi::str_to_nsstring(path_str));
         let config = unsafe { MLModelConfiguration::new() };
         let ml_units = match compute_units {
+            ComputeUnits::CpuOnly => MLComputeUnits(1),
             ComputeUnits::CpuAndGpu => MLComputeUnits::CPUAndGPU,
             ComputeUnits::CpuAndNeuralEngine => MLComputeUnits(2),
             ComputeUnits::All => MLComputeUnits::All,
@@ -251,6 +259,27 @@ impl Model {
         Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
     }
 
+    /// Run batch prediction for multiple input sets at once.
+    ///
+    /// More efficient than calling `predict()` in a loop.
+    #[cfg(target_vendor = "apple")]
+    pub fn predict_batch(&self, batch: &batch::BatchProvider) -> Result<batch::BatchPrediction> {
+        use objc2_core_ml::MLBatchProvider;
+
+        let batch_ref: &objc2::runtime::ProtocolObject<dyn MLBatchProvider> =
+            objc2::runtime::ProtocolObject::from_ref(&*batch.inner);
+
+        let result = unsafe { self.inner.predictionsFromBatch_error(batch_ref) }
+            .map_err(|e| Error::from_nserror(ErrorKind::Prediction, &e))?;
+
+        Ok(batch::BatchPrediction { inner: result })
+    }
+
+    #[cfg(not(target_vendor = "apple"))]
+    pub fn predict_batch(&self, _batch: &batch::BatchProvider) -> Result<batch::BatchPrediction> {
+        Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+    }
+
     #[cfg(not(target_vendor = "apple"))]
     pub fn inputs(&self) -> Vec<FeatureDescription> { vec![] }
 
@@ -398,6 +427,92 @@ impl Prediction {
     pub fn get_f32_into(&self, _name: &str, _buf: &mut [f32]) -> Result<Vec<usize>> {
         Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
     }
+
+    /// Get an output as (Vec<i32>, shape). Only works if the output is Int32.
+    #[cfg(target_vendor = "apple")]
+    #[allow(deprecated)]
+    pub fn get_i32(&self, name: &str) -> Result<(Vec<i32>, Vec<usize>)> {
+        objc2::rc::autoreleasepool(|_pool| {
+            let (count, shape, data_type, array) = self.get_output_array(name)?;
+            match data_type {
+                Some(DataType::Int32) => {
+                    let mut buf = vec![0i32; count];
+                    unsafe {
+                        let ptr = array.dataPointer();
+                        let src = ptr.as_ptr() as *const i32;
+                        std::ptr::copy_nonoverlapping(src, buf.as_mut_ptr(), count);
+                    }
+                    Ok((buf, shape))
+                }
+                Some(dt) => Err(Error::new(
+                    ErrorKind::Prediction,
+                    format!("output '{name}' is {dt}, not Int32"),
+                )),
+                None => Err(Error::new(ErrorKind::Prediction, "unsupported output data type")),
+            }
+        })
+    }
+
+    /// Get an output as (Vec<f64>, shape). Only works if the output is Float64.
+    #[cfg(target_vendor = "apple")]
+    #[allow(deprecated)]
+    pub fn get_f64(&self, name: &str) -> Result<(Vec<f64>, Vec<usize>)> {
+        objc2::rc::autoreleasepool(|_pool| {
+            let (count, shape, data_type, array) = self.get_output_array(name)?;
+            match data_type {
+                Some(DataType::Float64) => {
+                    let mut buf = vec![0.0f64; count];
+                    unsafe {
+                        let ptr = array.dataPointer();
+                        let src = ptr.as_ptr() as *const f64;
+                        std::ptr::copy_nonoverlapping(src, buf.as_mut_ptr(), count);
+                    }
+                    Ok((buf, shape))
+                }
+                Some(dt) => Err(Error::new(
+                    ErrorKind::Prediction,
+                    format!("output '{name}' is {dt}, not Float64"),
+                )),
+                None => Err(Error::new(ErrorKind::Prediction, "unsupported output data type")),
+            }
+        })
+    }
+
+    /// Get an output as raw bytes and its shape + data type.
+    #[cfg(target_vendor = "apple")]
+    #[allow(deprecated)]
+    pub fn get_raw(&self, name: &str) -> Result<(Vec<u8>, Vec<usize>, Option<DataType>)> {
+        objc2::rc::autoreleasepool(|_pool| {
+            let (count, shape, data_type, array) = self.get_output_array(name)?;
+            let byte_size = data_type.map(|dt| dt.byte_size()).unwrap_or(4);
+            let total_bytes = count * byte_size;
+            let mut buf = vec![0u8; total_bytes];
+            unsafe {
+                let ptr = array.dataPointer();
+                std::ptr::copy_nonoverlapping(
+                    ptr.as_ptr() as *const u8,
+                    buf.as_mut_ptr(),
+                    total_bytes,
+                );
+            }
+            Ok((buf, shape, data_type))
+        })
+    }
+
+    #[cfg(not(target_vendor = "apple"))]
+    pub fn get_i32(&self, _name: &str) -> Result<(Vec<i32>, Vec<usize>)> {
+        Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+    }
+
+    #[cfg(not(target_vendor = "apple"))]
+    pub fn get_f64(&self, _name: &str) -> Result<(Vec<f64>, Vec<usize>)> {
+        Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+    }
+
+    #[cfg(not(target_vendor = "apple"))]
+    pub fn get_raw(&self, _name: &str) -> Result<(Vec<u8>, Vec<usize>, Option<DataType>)> {
+        Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+    }
 }
 
 /// Convert a half-precision float (u16 bits) to f32.
@@ -446,6 +561,11 @@ mod tests {
     fn compute_units_display() {
         assert_eq!(format!("{}", ComputeUnits::CpuAndGpu), "CPU + GPU");
         assert_eq!(format!("{}", ComputeUnits::All), "All (CPU + GPU + ANE)");
+    }
+
+    #[test]
+    fn compute_units_display_cpu_only() {
+        assert_eq!(format!("{}", ComputeUnits::CpuOnly), "CPU only");
     }
 
     #[cfg(not(target_vendor = "apple"))]

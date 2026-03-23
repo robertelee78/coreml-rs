@@ -1,6 +1,6 @@
 [package]
 name = "coreml-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.75.0"
 license = "Apache-2.0 OR MIT"
@@ -27,12 +27,17 @@ objc2-core-ml = { version = "0.3", features = [
     "MLMultiArray",
     "MLMultiArrayConstraint",
     "MLMultiArrayShapeConstraint",
+    "MLMultiArrayShapeConstraintType",
     "MLFeatureValue",
     "MLFeatureDescription",
     "MLFeatureType",
     "MLDictionaryFeatureProvider",
     "MLFeatureProvider",
     "MLPredictionOptions",
+    "MLBatchProvider",
+    "MLArrayBatchProvider",
+    "MLOptimizationHints",
+    "MLModel_MLModelCompilation",
     "block2",
 ] }
 block2 = "0.6"
