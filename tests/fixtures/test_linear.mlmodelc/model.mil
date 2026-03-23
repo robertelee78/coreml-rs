@@ -1,0 +1,10 @@
+program(1.0)
+[buildInfo = dict<tensor<string, []>, tensor<string, []>>({{"coremlc-component-MIL", "3510.2.1"}, {"coremlc-version", "3500.32.1"}, {"coremltools-component-torch", "2.11.0"}, {"coremltools-source-dialect", "TorchScript"}, {"coremltools-version", "9.0"}})]
+{
+    func main<ios16>(tensor<fp16, [1, 4]> input) {
+            tensor<fp16, []> var_2_to_fp16 = const()[name = tensor<string, []>("op_2_to_fp16"), val = tensor<fp16, []>(0x1p+1)];
+            tensor<fp16, [1, 4]> var_3_cast_fp16 = mul(x = input, y = var_2_to_fp16)[name = tensor<string, []>("op_3_cast_fp16")];
+            tensor<fp16, []> var_5_to_fp16 = const()[name = tensor<string, []>("op_5_to_fp16"), val = tensor<fp16, []>(0x1p+0)];
+            tensor<fp16, [1, 4]> output = add(x = var_3_cast_fp16, y = var_5_to_fp16)[name = tensor<string, []>("op_6_cast_fp16")];
+        } -> (output);
+}

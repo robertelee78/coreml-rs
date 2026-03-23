@@ -5,10 +5,12 @@
 //! Requires macOS or iOS. On non-Apple targets, types exist as stubs
 //! returning `Error::UnsupportedPlatform`.
 
+pub mod description;
 pub mod error;
 pub(crate) mod ffi;
 pub mod tensor;
 
+pub use description::{FeatureDescription, FeatureType, ModelMetadata};
 pub use error::{Error, ErrorKind, Result};
 pub use tensor::{BorrowedTensor, DataType, OwnedTensor};
 
@@ -42,7 +44,15 @@ pub struct Model {
     path: std::path::PathBuf,
 }
 
+#[cfg(target_vendor = "apple")]
+impl std::fmt::Debug for Model {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Model").field("path", &self.path).finish()
+    }
+}
+
 #[cfg(not(target_vendor = "apple"))]
+#[derive(Debug)]
 pub struct Model {
     _private: (),
 }
@@ -130,6 +140,38 @@ impl Model {
     pub fn predict(&self, _inputs: &[(&str, &BorrowedTensor<'_>)]) -> Result<Prediction> {
         Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
     }
+
+    /// Get descriptions of all model inputs.
+    #[cfg(target_vendor = "apple")]
+    pub fn inputs(&self) -> Vec<FeatureDescription> {
+        let desc = unsafe { self.inner.modelDescription() };
+        let input_map = unsafe { desc.inputDescriptionsByName() };
+        description::extract_features(&input_map)
+    }
+
+    /// Get descriptions of all model outputs.
+    #[cfg(target_vendor = "apple")]
+    pub fn outputs(&self) -> Vec<FeatureDescription> {
+        let desc = unsafe { self.inner.modelDescription() };
+        let output_map = unsafe { desc.outputDescriptionsByName() };
+        description::extract_features(&output_map)
+    }
+
+    /// Get model metadata (author, description, version, license).
+    #[cfg(target_vendor = "apple")]
+    pub fn metadata(&self) -> ModelMetadata {
+        let desc = unsafe { self.inner.modelDescription() };
+        description::extract_metadata(&desc)
+    }
+
+    #[cfg(not(target_vendor = "apple"))]
+    pub fn inputs(&self) -> Vec<FeatureDescription> { vec![] }
+
+    #[cfg(not(target_vendor = "apple"))]
+    pub fn outputs(&self) -> Vec<FeatureDescription> { vec![] }
+
+    #[cfg(not(target_vendor = "apple"))]
+    pub fn metadata(&self) -> ModelMetadata { ModelMetadata::default() }
 }
 
 #[cfg(target_vendor = "apple")]
@@ -148,7 +190,7 @@ pub struct Prediction {
 }
 
 impl Prediction {
-    /// Get an output as (Vec<f32>, shape).
+    /// Get an output as (Vec<f32>, shape), converting from the model's native data type.
     #[cfg(target_vendor = "apple")]
     #[allow(deprecated)]
     pub fn get_f32(&self, name: &str) -> Result<(Vec<f32>, Vec<usize>)> {
@@ -165,12 +207,45 @@ impl Prediction {
 
         let shape = ffi::nsarray_to_shape(unsafe { &array.shape() });
         let count = tensor::element_count(&shape);
+        let dt_raw = unsafe { array.dataType() };
+        let data_type = ffi::ml_to_datatype(dt_raw.0);
+
         let mut buf = vec![0.0f32; count];
 
         unsafe {
             let ptr = array.dataPointer();
-            let src = ptr.as_ptr() as *const f32;
-            std::ptr::copy_nonoverlapping(src, buf.as_mut_ptr(), count);
+            match data_type {
+                Some(DataType::Float32) => {
+                    let src = ptr.as_ptr() as *const f32;
+                    std::ptr::copy_nonoverlapping(src, buf.as_mut_ptr(), count);
+                }
+                Some(DataType::Float16) => {
+                    // Convert f16 to f32
+                    let src = ptr.as_ptr() as *const u16;
+                    for i in 0..count {
+                        let bits = *src.add(i);
+                        buf[i] = f16_to_f32(bits);
+                    }
+                }
+                Some(DataType::Float64) => {
+                    let src = ptr.as_ptr() as *const f64;
+                    for i in 0..count {
+                        buf[i] = *src.add(i) as f32;
+                    }
+                }
+                Some(DataType::Int32) => {
+                    let src = ptr.as_ptr() as *const i32;
+                    for i in 0..count {
+                        buf[i] = *src.add(i) as f32;
+                    }
+                }
+                None => {
+                    return Err(Error::new(
+                        ErrorKind::Prediction,
+                        format!("unsupported output data type for '{name}'"),
+                    ));
+                }
+            }
         }
 
         Ok((buf, shape))
@@ -179,6 +254,43 @@ impl Prediction {
     #[cfg(not(target_vendor = "apple"))]
     pub fn get_f32(&self, _name: &str) -> Result<(Vec<f32>, Vec<usize>)> {
         Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+    }
+}
+
+/// Convert a half-precision float (u16 bits) to f32.
+#[cfg(target_vendor = "apple")]
+fn f16_to_f32(bits: u16) -> f32 {
+    let sign = ((bits >> 15) & 1) as u32;
+    let exp = ((bits >> 10) & 0x1f) as u32;
+    let frac = (bits & 0x3ff) as u32;
+
+    if exp == 0 {
+        if frac == 0 {
+            // Zero
+            f32::from_bits(sign << 31)
+        } else {
+            // Subnormal: normalize
+            let mut e = 0i32;
+            let mut f = frac;
+            while (f & 0x400) == 0 {
+                f <<= 1;
+                e -= 1;
+            }
+            f &= 0x3ff;
+            let exp32 = (127 - 15 + 1 + e) as u32;
+            f32::from_bits((sign << 31) | (exp32 << 23) | (f << 13))
+        }
+    } else if exp == 31 {
+        // Inf or NaN
+        if frac == 0 {
+            f32::from_bits((sign << 31) | (0xff << 23))
+        } else {
+            f32::from_bits((sign << 31) | (0xff << 23) | (frac << 13))
+        }
+    } else {
+        // Normal
+        let exp32 = exp + (127 - 15);
+        f32::from_bits((sign << 31) | (exp32 << 23) | (frac << 13))
     }
 }
 
