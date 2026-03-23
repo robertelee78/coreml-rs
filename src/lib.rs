@@ -315,6 +315,7 @@ impl Prediction {
 
     #[cfg(target_vendor = "apple")]
     #[allow(deprecated)]
+    #[allow(clippy::type_complexity)]
     fn get_output_array(
         &self,
         name: &str,
@@ -345,6 +346,7 @@ impl Prediction {
 
     #[cfg(target_vendor = "apple")]
     #[allow(deprecated)]
+    #[allow(clippy::needless_range_loop)]
     fn copy_array_to_f32(
         array: &objc2_core_ml::MLMultiArray,
         data_type: Option<DataType>,

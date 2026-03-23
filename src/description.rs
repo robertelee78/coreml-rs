@@ -1,6 +1,6 @@
-/// Model introspection types.
-///
-/// Covers FR-4.1, FR-4.2, FR-4.3.
+//! Model introspection types.
+//!
+//! Covers FR-4.1, FR-4.2, FR-4.3.
 
 use crate::tensor::DataType;
 

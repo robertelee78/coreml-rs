@@ -22,7 +22,7 @@ mod inference {
         let (output, shape) = prediction.get_f32("output").unwrap();
 
         assert_eq!(shape, vec![1, 4]);
-        let expected = vec![3.0f32, 5.0, 7.0, 9.0];
+        let expected = [3.0f32, 5.0, 7.0, 9.0];
         for (got, want) in output.iter().zip(expected.iter()) {
             assert!(
                 (got - want).abs() < 0.01,
@@ -59,7 +59,7 @@ mod inference {
         let (output, _) = prediction.get_f32("output").unwrap();
 
         // 2*(-1)+1=-1, 2*(-0.5)+1=0, 2*(0)+1=1, 2*(0.5)+1=2
-        let expected = vec![-1.0f32, 0.0, 1.0, 2.0];
+        let expected = [-1.0f32, 0.0, 1.0, 2.0];
         for (got, want) in output.iter().zip(expected.iter()) {
             assert!(
                 (got - want).abs() < 0.05,
@@ -77,7 +77,7 @@ mod inference {
         let prediction = model.predict(&[("input", &tensor)]).unwrap();
         let (output, _) = prediction.get_f32("output").unwrap();
 
-        let expected = vec![201.0f32, 1001.0, -399.0, 1.002];
+        let expected = [201.0f32, 1001.0, -399.0, 1.002];
         for (got, want) in output.iter().zip(expected.iter()) {
             let tol = want.abs() * 0.01 + 0.1; // relative + absolute tolerance for f16
             assert!(
@@ -162,7 +162,7 @@ mod inference {
         let prediction = model.predict(&[("input", &tensor)]).unwrap();
         let (output, _) = prediction.get_f32("output").unwrap();
 
-        let expected = vec![3.0f32, 5.0, 7.0, 9.0];
+        let expected = [3.0f32, 5.0, 7.0, 9.0];
         for (got, want) in output.iter().zip(expected.iter()) {
             assert!((got - want).abs() < 0.01);
         }
@@ -200,13 +200,13 @@ mod multi_io {
         assert_eq!(count_shape, vec![1, 2]);
 
         // sum_output = 2*float_input + 1
-        let expected_sum = vec![3.0f32, 5.0, 7.0, 9.0];
+        let expected_sum = [3.0f32, 5.0, 7.0, 9.0];
         for (got, want) in sum_out.iter().zip(expected_sum.iter()) {
             assert!((got - want).abs() < 0.1, "sum: got {got}, expected {want}");
         }
 
         // count_output = 2*int_input
-        let expected_count = vec![10.0f32, 20.0];
+        let expected_count = [10.0f32, 20.0];
         for (got, want) in count_out.iter().zip(expected_count.iter()) {
             assert!((got - want).abs() < 0.5, "count: got {got}, expected {want}");
         }

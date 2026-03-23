@@ -1,4 +1,4 @@
-/// Internal FFI helpers for converting between Rust and Foundation types.
+//! Internal FFI helpers for converting between Rust and Foundation types.
 
 #[cfg(target_vendor = "apple")]
 use objc2::rc::Retained;

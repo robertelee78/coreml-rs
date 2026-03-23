@@ -1,4 +1,4 @@
-/// Tensor types for zero-copy data exchange with CoreML.
+//! Tensor types for zero-copy data exchange with CoreML.
 
 use crate::error::{Error, ErrorKind, Result};
 
@@ -12,6 +12,7 @@ pub enum DataType {
 }
 
 impl DataType {
+    /// Returns the size in bytes of a single element of this data type.
     pub fn byte_size(self) -> usize {
         match self {
             Self::Float16 => 2,
@@ -33,10 +34,12 @@ impl std::fmt::Display for DataType {
     }
 }
 
+/// Returns the total number of elements for a tensor with the given shape.
 pub fn element_count(shape: &[usize]) -> usize {
-    shape.iter().copied().fold(1, |acc, d| acc * d)
+    shape.iter().copied().product()
 }
 
+/// Computes row-major strides for a tensor with the given shape.
 pub fn compute_strides(shape: &[usize]) -> Vec<usize> {
     let ndims = shape.len();
     if ndims == 0 {
@@ -49,11 +52,12 @@ pub fn compute_strides(shape: &[usize]) -> Vec<usize> {
     strides
 }
 
+/// Validates that `data_len` matches the element count implied by `shape`.
 pub fn validate_shape(data_len: usize, shape: &[usize]) -> Result<()> {
     if shape.is_empty() {
         return Err(Error::new(ErrorKind::InvalidShape, "shape must not be empty"));
     }
-    if shape.iter().any(|&d| d == 0) {
+    if shape.contains(&0) {
         return Err(Error::new(
             ErrorKind::InvalidShape,
             format!("shape contains zero dimension: {shape:?}"),
@@ -168,7 +172,7 @@ mod platform {
             if shape.is_empty() {
                 return Err(Error::new(ErrorKind::InvalidShape, "shape must not be empty"));
             }
-            if shape.iter().any(|&d| d == 0) {
+            if shape.contains(&0) {
                 return Err(Error::new(ErrorKind::InvalidShape, format!("shape contains zero dimension: {shape:?}")));
             }
 

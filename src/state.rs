@@ -1,7 +1,7 @@
-/// Stateful prediction support (MLState).
-///
-/// Requires macOS 15+ / iOS 18+.
-/// Covers FR-5.1, FR-5.2, FR-5.3.
+//! Stateful prediction support (MLState).
+//!
+//! Requires macOS 15+ / iOS 18+.
+//! Covers FR-5.1, FR-5.2, FR-5.3.
 
 #[cfg(target_vendor = "apple")]
 use objc2::rc::Retained;

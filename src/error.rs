@@ -1,4 +1,4 @@
-/// Error types for the coreml crate.
+//! Error types for the coreml crate.
 
 use std::fmt;
 
@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn all_error_kinds_distinct() {
-        let kinds = vec![
+        let kinds = [
             ErrorKind::ModelLoad, ErrorKind::TensorCreate, ErrorKind::Prediction,
             ErrorKind::Introspection, ErrorKind::InvalidShape, ErrorKind::UnsupportedPlatform,
         ];

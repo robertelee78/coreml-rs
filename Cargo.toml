@@ -5,7 +5,9 @@ edition = "2021"
 rust-version = "1.75.0"
 license = "Apache-2.0 OR MIT"
 description = "Rust implementation of CoreML"
+authors = ["coreml-rs contributors"]
 repository = "https://github.com/robertelee78/coreml"
+documentation = "https://docs.rs/coreml-rs"
 keywords = ["coreml", "apple", "neural-engine", "inference", "machine-learning"]
 categories = ["os::macos-apis", "science"]
 

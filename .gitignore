@@ -1,4 +1,15 @@
 /target
+Cargo.lock
 .DS_Store
 *.swp
 *.swo
+*.orig
+
+# Dev tooling artifacts
+.claude-flow/
+_bmad/
+_bmad-output/
+
+# IDE files
+.idea/
+.vscode/

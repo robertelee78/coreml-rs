@@ -1,6 +1,6 @@
-/// Model compilation (.mlmodel/.mlpackage -> .mlmodelc).
-///
-/// Covers FR-7.1, FR-7.2.
+//! Model compilation (.mlmodel/.mlpackage -> .mlmodelc).
+//!
+//! Covers FR-7.1, FR-7.2.
 
 use crate::error::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
