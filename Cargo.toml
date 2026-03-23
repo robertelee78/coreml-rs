@@ -1,0 +1,41 @@
+[package]
+name = "coreml-rs"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75.0"
+license = "Apache-2.0 OR MIT"
+description = "Rust implementation of CoreML"
+repository = "https://github.com/robertelee78/coreml"
+keywords = ["coreml", "apple", "neural-engine", "inference", "machine-learning"]
+categories = ["os::macos-apis", "science"]
+
+[dependencies]
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = [
+    "NSString", "NSArray", "NSDictionary", "NSValue",
+    "NSURL", "NSError", "NSSet", "NSEnumerator",
+    "NSObjCRuntime",
+] }
+objc2-core-ml = { version = "0.3", features = [
+    "MLModel",
+    "MLModelConfiguration",
+    "MLModelDescription",
+    "MLMultiArray",
+    "MLMultiArrayConstraint",
+    "MLMultiArrayShapeConstraint",
+    "MLFeatureValue",
+    "MLFeatureDescription",
+    "MLFeatureType",
+    "MLDictionaryFeatureProvider",
+    "MLFeatureProvider",
+    "MLPredictionOptions",
+    "block2",
+] }
+block2 = "0.6"
+
+[dev-dependencies]
+
+[features]
+default = []
