@@ -1,13 +1,13 @@
 [package]
-name = "coreml-rs"
+name = "coreml-native"
 version = "0.2.0"
 edition = "2021"
 rust-version = "1.75.0"
 license = "Apache-2.0 OR MIT"
-description = "Rust implementation of CoreML"
-authors = ["coreml-rs contributors"]
-repository = "https://github.com/robertelee78/coreml"
-documentation = "https://docs.rs/coreml-rs"
+description = "Safe, ergonomic Rust bindings for Apple CoreML inference with ANE acceleration"
+authors = ["coreml-native contributors"]
+repository = "https://github.com/robertelee78/coreml-native"
+documentation = "https://docs.rs/coreml-native"
 keywords = ["coreml", "apple", "neural-engine", "inference", "machine-learning"]
 categories = ["os::macos-apis", "science"]
 

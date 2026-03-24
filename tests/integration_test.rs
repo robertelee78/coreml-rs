@@ -9,7 +9,7 @@ const MODEL_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/te
 #[cfg(target_vendor = "apple")]
 mod inference {
     use super::MODEL_PATH;
-    use coreml_rs::{BorrowedTensor, ComputeUnits, Model};
+    use coreml_native::{BorrowedTensor, ComputeUnits, Model};
 
     #[test]
     fn predict_basic_linear() {
@@ -143,7 +143,7 @@ mod inference {
 
         let mut short_buf = vec![0.0f32; 2];
         let err = prediction.get_f32_into("output", &mut short_buf).unwrap_err();
-        assert_eq!(err.kind(), &coreml_rs::ErrorKind::InvalidShape);
+        assert_eq!(err.kind(), &coreml_native::ErrorKind::InvalidShape);
     }
 
     #[test]
@@ -175,7 +175,7 @@ const MULTI_IO_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures
 #[cfg(target_vendor = "apple")]
 mod multi_io {
     use super::MULTI_IO_PATH;
-    use coreml_rs::{BorrowedTensor, ComputeUnits, Model, OwnedTensor, DataType};
+    use coreml_native::{BorrowedTensor, ComputeUnits, Model, OwnedTensor, DataType};
 
     #[test]
     fn predict_multi_input_multi_output() {
@@ -286,7 +286,7 @@ mod multi_io {
 #[cfg(target_vendor = "apple")]
 mod introspection {
     use super::MODEL_PATH;
-    use coreml_rs::{ComputeUnits, DataType, FeatureType, Model};
+    use coreml_native::{ComputeUnits, DataType, FeatureType, Model};
 
     #[test]
     fn input_descriptions() {
@@ -339,7 +339,7 @@ mod introspection {
 
 #[cfg(target_vendor = "apple")]
 mod error_handling {
-    use coreml_rs::{BorrowedTensor, ComputeUnits, ErrorKind, Model};
+    use coreml_native::{BorrowedTensor, ComputeUnits, ErrorKind, Model};
 
     #[test]
     fn load_invalid_path() {

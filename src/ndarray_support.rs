@@ -1,13 +1,13 @@
 //! Optional ndarray integration.
 //!
 //! Enabled by the `ndarray` feature flag. Provides conversions between
-//! ndarray arrays and coreml-rs tensor types.
+//! ndarray arrays and coreml-native tensor types.
 //!
 //! # Usage
 //!
 //! ```toml
 //! [dependencies]
-//! coreml-rs = { version = "0.2", features = ["ndarray"] }
+//! coreml-native = { version = "0.2", features = ["ndarray"] }
 //! ```
 //!
 //! # Examples
@@ -16,8 +16,8 @@
 //!
 //! ```rust,ignore
 //! use ndarray::array;
-//! use coreml_rs::tensor::BorrowedTensor;
-//! use coreml_rs::ndarray_support::PredictionNdarray;
+//! use coreml_native::tensor::BorrowedTensor;
+//! use coreml_native::ndarray_support::PredictionNdarray;
 //!
 //! let input = array![[1.0f32, 2.0], [3.0, 4.0]].into_dyn();
 //! let tensor = BorrowedTensor::from_ndarray_f32(&input)?;

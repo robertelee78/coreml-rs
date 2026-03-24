@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug in coreml-rs
+about: Report a bug in coreml-native
 labels: bug
 ---
 
@@ -24,7 +24,7 @@ A clear description of what you expected to happen.
 
 - **macOS version**: (e.g., 14.5 Sonoma)
 - **Rust version**: (output of `rustc --version`)
-- **coreml-rs version**: (e.g., 0.1.0)
+- **coreml-native version**: (e.g., 0.1.0)
 - **Hardware**: (Apple Silicon M1/M2/M3/M4 or Intel)
 - **CoreML model format**: (e.g., .mlpackage, .mlmodelc)
 

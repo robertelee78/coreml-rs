@@ -1,4 +1,4 @@
-# Contributing to coreml-rs
+# Contributing to coreml-native
 
 Thank you for your interest in contributing. This document covers the essentials.
 

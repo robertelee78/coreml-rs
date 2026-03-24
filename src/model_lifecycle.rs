@@ -34,7 +34,7 @@ use std::path::PathBuf;
 /// # Example
 ///
 /// ```ignore
-/// use coreml_rs::{ComputeUnits, ModelHandle};
+/// use coreml_native::{ComputeUnits, ModelHandle};
 ///
 /// let handle = ModelHandle::load("model.mlmodelc", ComputeUnits::All)?;
 /// let prediction = handle.predict(&[("input", &tensor)])?;

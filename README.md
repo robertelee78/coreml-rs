@@ -1,4 +1,4 @@
-# coreml-rs
+# coreml-native
 
 Safe, ergonomic Rust bindings for Apple CoreML inference with full Apple Neural Engine (ANE) acceleration. Built on [`objc2-core-ml`](https://docs.rs/objc2-core-ml) — no C bridge, no Swift runtime, pure Rust.
 
@@ -24,7 +24,7 @@ Safe, ergonomic Rust bindings for Apple CoreML inference with full Apple Neural 
 ## Quick Start
 
 ```rust
-use coreml_rs::{Model, BorrowedTensor, ComputeUnits};
+use coreml_native::{Model, BorrowedTensor, ComputeUnits};
 
 let model = Model::load("model.mlmodelc", ComputeUnits::All)?;
 
@@ -42,7 +42,7 @@ println!("shape: {shape:?}, output: {output:?}");
 `CompletionFuture` works with any async runtime (tokio, async-std, smol) or can be blocked on synchronously:
 
 ```rust
-use coreml_rs::{Model, BorrowedTensor, ComputeUnits};
+use coreml_native::{Model, BorrowedTensor, ComputeUnits};
 
 // Async load — .await or .block_on()
 let model = Model::load_async("model.mlmodelc", ComputeUnits::All)?
@@ -65,7 +65,7 @@ let model = Model::load_from_bytes(&spec_bytes, ComputeUnits::All)?
 More efficient than calling `predict()` in a loop — CoreML optimizes across the batch:
 
 ```rust
-use coreml_rs::{Model, BorrowedTensor, ComputeUnits, BatchProvider};
+use coreml_native::{Model, BorrowedTensor, ComputeUnits, BatchProvider};
 
 let model = Model::load("model.mlmodelc", ComputeUnits::All)?;
 
@@ -74,11 +74,11 @@ let data_b = vec![2.0f32; 4];
 let tensor_a = BorrowedTensor::from_f32(&data_a, &[1, 4])?;
 let tensor_b = BorrowedTensor::from_f32(&data_b, &[1, 4])?;
 
-let inputs: Vec<Vec<(&str, &dyn coreml_rs::AsMultiArray)>> = vec![
+let inputs: Vec<Vec<(&str, &dyn coreml_native::AsMultiArray)>> = vec![
     vec![("input", &tensor_a)],
     vec![("input", &tensor_b)],
 ];
-let input_refs: Vec<&[(&str, &dyn coreml_rs::AsMultiArray)]> =
+let input_refs: Vec<&[(&str, &dyn coreml_native::AsMultiArray)]> =
     inputs.iter().map(|v| v.as_slice()).collect();
 
 let batch = BatchProvider::new(&input_refs)?;
@@ -95,7 +95,7 @@ for i in 0..results.count() {
 `ModelHandle` uses move semantics to prevent use-after-unload at compile time:
 
 ```rust
-use coreml_rs::{ModelHandle, ComputeUnits};
+use coreml_native::{ModelHandle, ComputeUnits};
 
 let handle = ModelHandle::load("model.mlmodelc", ComputeUnits::All)?;
 
@@ -115,7 +115,7 @@ let handle = handle.reload()?;
 ### BorrowedTensor — zero-copy from Rust slices
 
 ```rust
-use coreml_rs::BorrowedTensor;
+use coreml_native::BorrowedTensor;
 
 // Supported: f32, i32, f64, f16 (as u16 bits), i16, i8, u32, u16, u8
 let tensor = BorrowedTensor::from_f32(&data, &[1, 4])?;
@@ -126,7 +126,7 @@ let tensor = BorrowedTensor::from_f16_bits(&half_data, &[1, 8])?;
 ### OwnedTensor — CoreML-allocated memory
 
 ```rust
-use coreml_rs::{OwnedTensor, DataType};
+use coreml_native::{OwnedTensor, DataType};
 
 let tensor = OwnedTensor::zeros(DataType::Float32, &[1, 4])?;
 let data = tensor.to_vec_f32()?;   // copy out as Vec<f32>
@@ -170,7 +170,7 @@ println!("author={:?} version={:?} updatable={}",
 ## Device Enumeration
 
 ```rust
-use coreml_rs::{available_devices, ComputeDevice};
+use coreml_native::{available_devices, ComputeDevice};
 
 for device in available_devices() {
     println!("{device}"); // "CPU", "GPU (M1 Pro)", "Neural Engine"
@@ -193,13 +193,13 @@ let pred2 = model.predict_stateful(&[("input", &tensor2)], &state)?;
 ## Runtime Compilation
 
 ```rust
-use coreml_rs::compile_model;
+use coreml_native::compile_model;
 
 // Sync
 let compiled_path = compile_model("model.mlpackage")?;
 
 // Async (macOS 14.4+)
-let compiled_path = coreml_rs::compile_model_async("model.mlpackage")?
+let compiled_path = coreml_native::compile_model_async("model.mlpackage")?
     .block_on()?;
 ```
 
@@ -209,12 +209,12 @@ Enable with the `ndarray` feature flag:
 
 ```toml
 [dependencies]
-coreml-rs = { version = "0.2", features = ["ndarray"] }
+coreml-native = { version = "0.2", features = ["ndarray"] }
 ```
 
 ```rust
 use ndarray::array;
-use coreml_rs::ndarray_support::PredictionNdarray;
+use coreml_native::ndarray_support::PredictionNdarray;
 
 // ndarray → tensor (zero-copy, must be standard layout)
 let input = array![[1.0f32, 2.0], [3.0, 4.0]].into_dyn();
@@ -238,7 +238,7 @@ println!("shape: {:?}, sum: {}", output.shape(), output.sum());
 
 | Crate | Approach | ANE | Standalone | Maintained |
 |-------|----------|-----|-----------|-----------|
-| **coreml-rs** | objc2 bindings | Full | Yes | Yes |
+| **coreml-native** | objc2 bindings | Full | Yes | Yes |
 | `objc2-core-ml` | Raw auto-gen | Full | Yes* | Yes |
 | `coreml-rs` (swarnimarun) | Swift bridge | Yes | No (Swift runtime) | Minimal |
 | `candle-coreml` | objc2 + Candle | Yes | No (Candle dep) | Yes |

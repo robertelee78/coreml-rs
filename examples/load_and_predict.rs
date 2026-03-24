@@ -2,7 +2,7 @@
 //!
 //! Usage: cargo run --example load_and_predict -- <path/to/model.mlmodelc>
 
-use coreml_rs::{BorrowedTensor, ComputeUnits, Model};
+use coreml_native::{BorrowedTensor, ComputeUnits, Model};
 
 fn main() {
     let model_path = std::env::args()

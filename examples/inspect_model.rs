@@ -2,7 +2,7 @@
 //!
 //! Usage: cargo run --example inspect_model -- <path/to/model.mlmodelc>
 
-use coreml_rs::{ComputeUnits, Model};
+use coreml_native::{ComputeUnits, Model};
 
 fn main() {
     let model_path = std::env::args()

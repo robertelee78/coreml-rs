@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest an improvement or new feature for coreml-rs
+about: Suggest an improvement or new feature for coreml-native
 labels: enhancement
 ---
 
