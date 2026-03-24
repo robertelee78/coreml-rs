@@ -12,6 +12,7 @@ keywords = ["coreml", "apple", "neural-engine", "inference", "machine-learning"]
 categories = ["os::macos-apis", "science"]
 
 [dependencies]
+ndarray = { version = "0.16", optional = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 objc2 = "0.6"
@@ -47,3 +48,4 @@ block2 = "0.6"
 
 [features]
 default = []
+ndarray = ["dep:ndarray"]

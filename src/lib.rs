@@ -15,6 +15,9 @@ pub mod state;
 pub mod tensor;
 pub mod batch;
 pub mod compute;
+pub mod model_lifecycle;
+#[cfg(feature = "ndarray")]
+pub mod ndarray_support;
 
 pub use async_bridge::CompletionFuture;
 pub use batch::{BatchPrediction, BatchProvider};
@@ -22,8 +25,11 @@ pub use compile::{compile_model, compile_model_async};
 pub use compute::{available_devices, ComputeDevice};
 pub use description::{FeatureDescription, FeatureType, ModelMetadata, ShapeConstraint};
 pub use error::{Error, ErrorKind, Result};
+pub use model_lifecycle::ModelHandle;
 pub use state::State;
 pub use tensor::{AsMultiArray, BorrowedTensor, DataType, OwnedTensor};
+#[cfg(feature = "ndarray")]
+pub use ndarray_support::PredictionNdarray;
 
 /// Compute unit selection for CoreML model loading.
 ///
@@ -423,6 +429,36 @@ impl Prediction {
                             buf[i] = *src.add(i) as f32;
                         }
                     }
+                    Some(DataType::Int16) => {
+                        let src = ptr.as_ptr() as *const i16;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
+                    Some(DataType::Int8) => {
+                        let src = ptr.as_ptr() as *const i8;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
+                    Some(DataType::UInt32) => {
+                        let src = ptr.as_ptr() as *const u32;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
+                    Some(DataType::UInt16) => {
+                        let src = ptr.as_ptr() as *const u16;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
+                    Some(DataType::UInt8) => {
+                        let src = ptr.as_ptr() as *const u8;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
                     None => {
                         return Err(Error::new(
                             ErrorKind::Prediction,
@@ -461,7 +497,12 @@ impl Prediction {
                     Some(DataType::Float32) => strided_copy!(f32, |v: f32| v),
                     Some(DataType::Float16) => strided_copy!(u16, |v: u16| f16_to_f32(v)),
                     Some(DataType::Float64) => strided_copy!(f64, |v: f64| v as f32),
-                    Some(DataType::Int32) => strided_copy!(i32, |v: i32| v as f32),
+                    Some(DataType::Int32)   => strided_copy!(i32, |v: i32| v as f32),
+                    Some(DataType::Int16)   => strided_copy!(i16, |v: i16| v as f32),
+                    Some(DataType::Int8)    => strided_copy!(i8,  |v: i8|  v as f32),
+                    Some(DataType::UInt32)  => strided_copy!(u32, |v: u32| v as f32),
+                    Some(DataType::UInt16)  => strided_copy!(u16, |v: u16| v as f32),
+                    Some(DataType::UInt8)   => strided_copy!(u8,  |v: u8|  v as f32),
                     None => {
                         return Err(Error::new(
                             ErrorKind::Prediction,

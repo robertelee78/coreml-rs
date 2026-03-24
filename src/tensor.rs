@@ -9,6 +9,11 @@ pub enum DataType {
     Float32,
     Float64,
     Int32,
+    Int16,
+    Int8,
+    UInt32,
+    UInt16,
+    UInt8,
 }
 
 impl DataType {
@@ -19,6 +24,11 @@ impl DataType {
             Self::Float32 => 4,
             Self::Float64 => 8,
             Self::Int32 => 4,
+            Self::Int16 => 2,
+            Self::Int8 => 1,
+            Self::UInt32 => 4,
+            Self::UInt16 => 2,
+            Self::UInt8 => 1,
         }
     }
 }
@@ -30,6 +40,11 @@ impl std::fmt::Display for DataType {
             Self::Float32 => write!(f, "Float32"),
             Self::Float64 => write!(f, "Float64"),
             Self::Int32 => write!(f, "Int32"),
+            Self::Int16 => write!(f, "Int16"),
+            Self::Int8 => write!(f, "Int8"),
+            Self::UInt32 => write!(f, "UInt32"),
+            Self::UInt16 => write!(f, "UInt16"),
+            Self::UInt8 => write!(f, "UInt8"),
         }
     }
 }
@@ -184,6 +199,111 @@ mod platform {
             .map_err(|e| Error::from_nserror(ErrorKind::TensorCreate, &e))?;
 
             Ok(Self { inner, shape: shape.to_vec(), data_type: DataType::Float16, _marker: std::marker::PhantomData })
+        }
+
+        pub fn from_i16(data: &'a [i16], shape: &[usize]) -> Result<Self> {
+            validate_shape(data.len(), shape)?;
+            let ns_shape = ffi::shape_to_nsarray(shape);
+            let strides = compute_strides(shape);
+            let ns_strides = ffi::shape_to_nsarray(&strides);
+            let ml_dtype = objc2_core_ml::MLMultiArrayDataType(ffi::datatype_to_ml(DataType::Int16));
+
+            let ptr = NonNull::new(data.as_ptr() as *mut c_void).ok_or_else(|| {
+                Error::new(ErrorKind::TensorCreate, "null data pointer")
+            })?;
+
+            let inner = unsafe {
+                MLMultiArray::initWithDataPointer_shape_dataType_strides_deallocator_error(
+                    MLMultiArray::alloc(), ptr, &ns_shape, ml_dtype, &ns_strides, None,
+                )
+            }
+            .map_err(|e| Error::from_nserror(ErrorKind::TensorCreate, &e))?;
+
+            Ok(Self { inner, shape: shape.to_vec(), data_type: DataType::Int16, _marker: std::marker::PhantomData })
+        }
+
+        pub fn from_i8(data: &'a [i8], shape: &[usize]) -> Result<Self> {
+            validate_shape(data.len(), shape)?;
+            let ns_shape = ffi::shape_to_nsarray(shape);
+            let strides = compute_strides(shape);
+            let ns_strides = ffi::shape_to_nsarray(&strides);
+            let ml_dtype = objc2_core_ml::MLMultiArrayDataType(ffi::datatype_to_ml(DataType::Int8));
+
+            let ptr = NonNull::new(data.as_ptr() as *mut c_void).ok_or_else(|| {
+                Error::new(ErrorKind::TensorCreate, "null data pointer")
+            })?;
+
+            let inner = unsafe {
+                MLMultiArray::initWithDataPointer_shape_dataType_strides_deallocator_error(
+                    MLMultiArray::alloc(), ptr, &ns_shape, ml_dtype, &ns_strides, None,
+                )
+            }
+            .map_err(|e| Error::from_nserror(ErrorKind::TensorCreate, &e))?;
+
+            Ok(Self { inner, shape: shape.to_vec(), data_type: DataType::Int8, _marker: std::marker::PhantomData })
+        }
+
+        pub fn from_u32(data: &'a [u32], shape: &[usize]) -> Result<Self> {
+            validate_shape(data.len(), shape)?;
+            let ns_shape = ffi::shape_to_nsarray(shape);
+            let strides = compute_strides(shape);
+            let ns_strides = ffi::shape_to_nsarray(&strides);
+            let ml_dtype = objc2_core_ml::MLMultiArrayDataType(ffi::datatype_to_ml(DataType::UInt32));
+
+            let ptr = NonNull::new(data.as_ptr() as *mut c_void).ok_or_else(|| {
+                Error::new(ErrorKind::TensorCreate, "null data pointer")
+            })?;
+
+            let inner = unsafe {
+                MLMultiArray::initWithDataPointer_shape_dataType_strides_deallocator_error(
+                    MLMultiArray::alloc(), ptr, &ns_shape, ml_dtype, &ns_strides, None,
+                )
+            }
+            .map_err(|e| Error::from_nserror(ErrorKind::TensorCreate, &e))?;
+
+            Ok(Self { inner, shape: shape.to_vec(), data_type: DataType::UInt32, _marker: std::marker::PhantomData })
+        }
+
+        pub fn from_u16(data: &'a [u16], shape: &[usize]) -> Result<Self> {
+            validate_shape(data.len(), shape)?;
+            let ns_shape = ffi::shape_to_nsarray(shape);
+            let strides = compute_strides(shape);
+            let ns_strides = ffi::shape_to_nsarray(&strides);
+            let ml_dtype = objc2_core_ml::MLMultiArrayDataType(ffi::datatype_to_ml(DataType::UInt16));
+
+            let ptr = NonNull::new(data.as_ptr() as *mut c_void).ok_or_else(|| {
+                Error::new(ErrorKind::TensorCreate, "null data pointer")
+            })?;
+
+            let inner = unsafe {
+                MLMultiArray::initWithDataPointer_shape_dataType_strides_deallocator_error(
+                    MLMultiArray::alloc(), ptr, &ns_shape, ml_dtype, &ns_strides, None,
+                )
+            }
+            .map_err(|e| Error::from_nserror(ErrorKind::TensorCreate, &e))?;
+
+            Ok(Self { inner, shape: shape.to_vec(), data_type: DataType::UInt16, _marker: std::marker::PhantomData })
+        }
+
+        pub fn from_u8(data: &'a [u8], shape: &[usize]) -> Result<Self> {
+            validate_shape(data.len(), shape)?;
+            let ns_shape = ffi::shape_to_nsarray(shape);
+            let strides = compute_strides(shape);
+            let ns_strides = ffi::shape_to_nsarray(&strides);
+            let ml_dtype = objc2_core_ml::MLMultiArrayDataType(ffi::datatype_to_ml(DataType::UInt8));
+
+            let ptr = NonNull::new(data.as_ptr() as *mut c_void).ok_or_else(|| {
+                Error::new(ErrorKind::TensorCreate, "null data pointer")
+            })?;
+
+            let inner = unsafe {
+                MLMultiArray::initWithDataPointer_shape_dataType_strides_deallocator_error(
+                    MLMultiArray::alloc(), ptr, &ns_shape, ml_dtype, &ns_strides, None,
+                )
+            }
+            .map_err(|e| Error::from_nserror(ErrorKind::TensorCreate, &e))?;
+
+            Ok(Self { inner, shape: shape.to_vec(), data_type: DataType::UInt8, _marker: std::marker::PhantomData })
         }
 
         pub fn shape(&self) -> &[usize] { &self.shape }
@@ -354,6 +474,26 @@ mod platform {
             validate_shape(_data.len(), shape)?;
             Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
         }
+        pub fn from_i16(_data: &'a [i16], shape: &[usize]) -> Result<Self> {
+            validate_shape(_data.len(), shape)?;
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn from_i8(_data: &'a [i8], shape: &[usize]) -> Result<Self> {
+            validate_shape(_data.len(), shape)?;
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn from_u32(_data: &'a [u32], shape: &[usize]) -> Result<Self> {
+            validate_shape(_data.len(), shape)?;
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn from_u16(_data: &'a [u16], shape: &[usize]) -> Result<Self> {
+            validate_shape(_data.len(), shape)?;
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
+        pub fn from_u8(_data: &'a [u8], shape: &[usize]) -> Result<Self> {
+            validate_shape(_data.len(), shape)?;
+            Err(Error::new(ErrorKind::UnsupportedPlatform, "CoreML requires Apple platform"))
+        }
         pub fn shape(&self) -> &[usize] { &self.shape }
         pub fn data_type(&self) -> DataType { self.data_type }
         pub fn element_count(&self) -> usize { element_count(&self.shape) }
@@ -444,6 +584,11 @@ mod tests {
         assert_eq!(DataType::Float32.byte_size(), 4);
         assert_eq!(DataType::Float64.byte_size(), 8);
         assert_eq!(DataType::Int32.byte_size(), 4);
+        assert_eq!(DataType::Int16.byte_size(), 2);
+        assert_eq!(DataType::Int8.byte_size(), 1);
+        assert_eq!(DataType::UInt32.byte_size(), 4);
+        assert_eq!(DataType::UInt16.byte_size(), 2);
+        assert_eq!(DataType::UInt8.byte_size(), 1);
     }
 
     #[test]
@@ -561,6 +706,51 @@ mod tests {
             let tensor = OwnedTensor::zeros(DataType::Float32, &[2]).unwrap();
             let bytes = tensor.to_raw_bytes().unwrap();
             assert_eq!(bytes.len(), 8); // 2 elements * 4 bytes
+        }
+
+        #[test]
+        fn borrowed_tensor_from_i16() {
+            let data = vec![1i16; 4];
+            let tensor = BorrowedTensor::from_i16(&data, &[2, 2]).unwrap();
+            assert_eq!(tensor.data_type(), DataType::Int16);
+            assert_eq!(tensor.element_count(), 4);
+            assert_eq!(tensor.size_bytes(), 8);
+        }
+
+        #[test]
+        fn borrowed_tensor_from_i8() {
+            let data = vec![1i8; 4];
+            let tensor = BorrowedTensor::from_i8(&data, &[2, 2]).unwrap();
+            assert_eq!(tensor.data_type(), DataType::Int8);
+            assert_eq!(tensor.element_count(), 4);
+            assert_eq!(tensor.size_bytes(), 4);
+        }
+
+        #[test]
+        fn borrowed_tensor_from_u32() {
+            let data = vec![1u32; 4];
+            let tensor = BorrowedTensor::from_u32(&data, &[2, 2]).unwrap();
+            assert_eq!(tensor.data_type(), DataType::UInt32);
+            assert_eq!(tensor.element_count(), 4);
+            assert_eq!(tensor.size_bytes(), 16);
+        }
+
+        #[test]
+        fn borrowed_tensor_from_u16() {
+            let data = vec![1u16; 4];
+            let tensor = BorrowedTensor::from_u16(&data, &[2, 2]).unwrap();
+            assert_eq!(tensor.data_type(), DataType::UInt16);
+            assert_eq!(tensor.element_count(), 4);
+            assert_eq!(tensor.size_bytes(), 8);
+        }
+
+        #[test]
+        fn borrowed_tensor_from_u8() {
+            let data = vec![1u8; 4];
+            let tensor = BorrowedTensor::from_u8(&data, &[2, 2]).unwrap();
+            assert_eq!(tensor.data_type(), DataType::UInt8);
+            assert_eq!(tensor.element_count(), 4);
+            assert_eq!(tensor.size_bytes(), 4);
         }
     }
 }

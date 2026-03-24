@@ -39,21 +39,48 @@ pub(crate) fn nsstring_to_string(s: &NSString) -> String {
 }
 
 /// Map our DataType to the raw isize value of MLMultiArrayDataType.
+///
+/// Verified values from objc2-core-ml-0.3.2 generated source:
+///   Float16 = 0x10000 | 16 = 65552
+///   Float32 = 0x10000 | 32 = 65568
+///   Float64 = 0x10000 | 64 = 65600
+///   Int32   = 0x20000 | 32 = 131104
+///   Int8    = 0x20000 | 8  = 131080  (defined in CoreML headers)
+///
+/// Computed from Apple's pattern (not defined in CoreML headers):
+///   Int16   = 0x20000 | 16 = 131088  (signed int, 16-bit; not a CoreML constant)
+///
+/// Unsigned integer types have no MLMultiArrayDataType constant in CoreML headers.
+/// Values below use a private sentinel range (0x30000 | bit_width) for internal
+/// tracking only. CoreML will reject these values at runtime; callers must be
+/// aware that UInt32/UInt16/UInt8 tensors cannot be passed to CoreML models directly.
+///   UInt32 = 0x30000 | 32 = 196640
+///   UInt16 = 0x30000 | 16 = 196624
+///   UInt8  = 0x30000 | 8  = 196616
 pub(crate) fn datatype_to_ml(dt: DataType) -> isize {
     match dt {
-        DataType::Float16 => 65552,
-        DataType::Float32 => 65568,
-        DataType::Float64 => 65600,
-        DataType::Int32 => 131104,
+        DataType::Float16 => 0x10000 | 16,   // 65552
+        DataType::Float32 => 0x10000 | 32,   // 65568
+        DataType::Float64 => 0x10000 | 64,   // 65600
+        DataType::Int32   => 0x20000 | 32,   // 131104
+        DataType::Int8    => 0x20000 | 8,    // 131080 — native CoreML constant
+        DataType::Int16   => 0x20000 | 16,   // 131088 — computed; not a CoreML constant
+        DataType::UInt32  => 0x30000 | 32,   // 196640 — sentinel; no CoreML mapping
+        DataType::UInt16  => 0x30000 | 16,   // 196624 — sentinel; no CoreML mapping
+        DataType::UInt8   => 0x30000 | 8,    // 196616 — sentinel; no CoreML mapping
     }
 }
 
 pub(crate) fn ml_to_datatype(raw: isize) -> Option<DataType> {
     match raw {
-        65552 => Some(DataType::Float16),
-        65568 => Some(DataType::Float32),
-        65600 => Some(DataType::Float64),
+        65552  => Some(DataType::Float16),
+        65568  => Some(DataType::Float32),
+        65600  => Some(DataType::Float64),
         131104 => Some(DataType::Int32),
+        131080 => Some(DataType::Int8),   // native CoreML constant
+        131088 => Some(DataType::Int16),  // computed; not a CoreML constant
+        // UInt32/UInt16/UInt8 use sentinel values with no CoreML header definition;
+        // they are excluded from reverse mapping since CoreML will not produce them.
         _ => None,
     }
 }
@@ -64,10 +91,30 @@ mod tests {
 
     #[test]
     fn datatype_roundtrip() {
-        for dt in [DataType::Float16, DataType::Float32, DataType::Float64, DataType::Int32] {
+        // These types have a defined (or computed) MLMultiArrayDataType mapping and
+        // support a full to/from roundtrip.
+        for dt in [
+            DataType::Float16,
+            DataType::Float32,
+            DataType::Float64,
+            DataType::Int32,
+            DataType::Int8,   // native CoreML constant
+            DataType::Int16,  // computed from Apple pattern
+        ] {
             let raw = datatype_to_ml(dt);
             let back = ml_to_datatype(raw).unwrap();
             assert_eq!(dt, back);
+        }
+    }
+
+    #[test]
+    fn unsigned_types_no_coreml_mapping() {
+        // UInt32, UInt16, UInt8 have no MLMultiArrayDataType constant in CoreML
+        // headers. Their sentinel values do not reverse-map to a DataType.
+        for dt in [DataType::UInt32, DataType::UInt16, DataType::UInt8] {
+            let raw = datatype_to_ml(dt);
+            assert_eq!(ml_to_datatype(raw), None,
+                "unsigned type {dt} sentinel value {raw} should not reverse-map");
         }
     }
 

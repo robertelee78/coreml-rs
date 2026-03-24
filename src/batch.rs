@@ -226,6 +226,36 @@ impl BatchPrediction {
                             buf[i] = *src.add(i) as f32;
                         }
                     }
+                    Some(crate::tensor::DataType::Int16) => {
+                        let src = ptr.as_ptr() as *const i16;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
+                    Some(crate::tensor::DataType::Int8) => {
+                        let src = ptr.as_ptr() as *const i8;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
+                    Some(crate::tensor::DataType::UInt32) => {
+                        let src = ptr.as_ptr() as *const u32;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
+                    Some(crate::tensor::DataType::UInt16) => {
+                        let src = ptr.as_ptr() as *const u16;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
+                    Some(crate::tensor::DataType::UInt8) => {
+                        let src = ptr.as_ptr() as *const u8;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
                     None => {
                         return Err(Error::new(
                             ErrorKind::Prediction,
