@@ -18,7 +18,7 @@ objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = [
     "NSString", "NSArray", "NSDictionary", "NSValue",
     "NSURL", "NSError", "NSSet", "NSEnumerator",
-    "NSObjCRuntime",
+    "NSObjCRuntime", "NSData",
 ] }
 objc2-core-ml = { version = "0.3", features = [
     "MLModel",
@@ -38,6 +38,7 @@ objc2-core-ml = { version = "0.3", features = [
     "MLArrayBatchProvider",
     "MLOptimizationHints",
     "MLModel_MLModelCompilation",
+    "MLModelAsset",
     "block2",
 ] }
 block2 = "0.6"

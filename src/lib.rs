@@ -5,17 +5,20 @@
 //! Requires macOS or iOS. On non-Apple targets, types exist as stubs
 //! returning `Error::UnsupportedPlatform`.
 
+pub mod async_bridge;
 pub mod compile;
 pub mod description;
 pub mod error;
 pub(crate) mod ffi;
+mod model_async;
 pub mod state;
 pub mod tensor;
 pub mod batch;
 pub mod compute;
 
+pub use async_bridge::CompletionFuture;
 pub use batch::{BatchPrediction, BatchProvider};
-pub use compile::compile_model;
+pub use compile::{compile_model, compile_model_async};
 pub use compute::{available_devices, ComputeDevice};
 pub use description::{FeatureDescription, FeatureType, ModelMetadata, ShapeConstraint};
 pub use error::{Error, ErrorKind, Result};
