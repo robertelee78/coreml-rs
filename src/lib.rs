@@ -373,6 +373,12 @@ impl Prediction {
         Ok((count, shape, data_type, array))
     }
 
+    /// Copy MLMultiArray data into a flat f32 buffer in row-major (C-contiguous) order.
+    ///
+    /// CoreML MLMultiArray outputs may have non-row-major strides (especially when
+    /// inference runs on GPU or ANE). This function reads the array's actual strides
+    /// and iterates in logical (row-major) index order, computing the physical offset
+    /// for each element using the strides.
     #[cfg(target_vendor = "apple")]
     #[allow(deprecated)]
     #[allow(clippy::needless_range_loop)]
@@ -384,34 +390,81 @@ impl Prediction {
     ) -> Result<()> {
         unsafe {
             let ptr = array.dataPointer();
-            match data_type {
-                Some(DataType::Float32) => {
-                    let src = ptr.as_ptr() as *const f32;
-                    std::ptr::copy_nonoverlapping(src, buf.as_mut_ptr(), count);
-                }
-                Some(DataType::Float16) => {
-                    let src = ptr.as_ptr() as *const u16;
-                    for i in 0..count {
-                        buf[i] = f16_to_f32(*src.add(i));
+            let shape = ffi::nsarray_to_shape(&array.shape());
+            let strides = ffi::nsarray_to_shape(&array.strides());
+            let row_major_strides = tensor::compute_strides(&shape);
+            let is_contiguous = strides == row_major_strides;
+
+            if is_contiguous {
+                // Fast path: data is already row-major contiguous
+                match data_type {
+                    Some(DataType::Float32) => {
+                        let src = ptr.as_ptr() as *const f32;
+                        std::ptr::copy_nonoverlapping(src, buf.as_mut_ptr(), count);
+                    }
+                    Some(DataType::Float16) => {
+                        let src = ptr.as_ptr() as *const u16;
+                        for i in 0..count {
+                            buf[i] = f16_to_f32(*src.add(i));
+                        }
+                    }
+                    Some(DataType::Float64) => {
+                        let src = ptr.as_ptr() as *const f64;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
+                    Some(DataType::Int32) => {
+                        let src = ptr.as_ptr() as *const i32;
+                        for i in 0..count {
+                            buf[i] = *src.add(i) as f32;
+                        }
+                    }
+                    None => {
+                        return Err(Error::new(
+                            ErrorKind::Prediction,
+                            "unsupported output data type",
+                        ));
                     }
                 }
-                Some(DataType::Float64) => {
-                    let src = ptr.as_ptr() as *const f64;
-                    for i in 0..count {
-                        buf[i] = *src.add(i) as f32;
-                    }
+            } else {
+                // Slow path: non-contiguous strides — iterate in logical row-major order,
+                // compute physical offset for each element using the actual strides.
+                let ndims = shape.len();
+                let mut indices = vec![0usize; ndims];
+
+                macro_rules! strided_copy {
+                    ($src_type:ty, $convert:expr) => {{
+                        let src = ptr.as_ptr() as *const $src_type;
+                        for logical_idx in 0..count {
+                            let physical: usize = indices.iter()
+                                .zip(strides.iter())
+                                .map(|(&i, &s)| i * s)
+                                .sum();
+                            buf[logical_idx] = $convert(*src.add(physical));
+                            // Increment indices in row-major order (last dim fastest)
+                            for d in (0..ndims).rev() {
+                                indices[d] += 1;
+                                if indices[d] < shape[d] {
+                                    break;
+                                }
+                                indices[d] = 0;
+                            }
+                        }
+                    }};
                 }
-                Some(DataType::Int32) => {
-                    let src = ptr.as_ptr() as *const i32;
-                    for i in 0..count {
-                        buf[i] = *src.add(i) as f32;
+
+                match data_type {
+                    Some(DataType::Float32) => strided_copy!(f32, |v: f32| v),
+                    Some(DataType::Float16) => strided_copy!(u16, |v: u16| f16_to_f32(v)),
+                    Some(DataType::Float64) => strided_copy!(f64, |v: f64| v as f32),
+                    Some(DataType::Int32) => strided_copy!(i32, |v: i32| v as f32),
+                    None => {
+                        return Err(Error::new(
+                            ErrorKind::Prediction,
+                            "unsupported output data type",
+                        ));
                     }
-                }
-                None => {
-                    return Err(Error::new(
-                        ErrorKind::Prediction,
-                        "unsupported output data type",
-                    ));
                 }
             }
         }
