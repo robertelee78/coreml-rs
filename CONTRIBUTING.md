@@ -4,7 +4,7 @@ Thank you for your interest in contributing. This document covers the essentials
 
 ## Reporting Bugs and Requesting Features
 
-Open an issue on GitHub at <https://github.com/robertelee78/coreml/issues>. For bugs, include:
+Open an issue on GitHub at <https://github.com/robertelee78/coreml-native/issues>. For bugs, include:
 
 - The Rust toolchain version (`rustc --version`)
 - macOS version and hardware (Intel vs Apple Silicon)
@@ -14,8 +14,8 @@ Open an issue on GitHub at <https://github.com/robertelee78/coreml/issues>. For 
 ## Development Setup
 
 ```bash
-git clone https://github.com/robertelee78/coreml.git
-cd coreml
+git clone https://github.com/robertelee78/coreml-native.git
+cd coreml-native
 cargo build
 cargo test
 ```

@@ -10,6 +10,9 @@ repository = "https://github.com/robertelee78/coreml-native"
 documentation = "https://docs.rs/coreml-native"
 keywords = ["coreml", "apple", "neural-engine", "inference", "machine-learning"]
 categories = ["os::macos-apis", "science"]
+exclude = [".claude/", ".claude-flow/", "_bmad/", "_bmad-output/", "docs/", "scripts/", ".github/"]
+homepage = "https://github.com/robertelee78/coreml-native"
+readme = "README.md"
 
 [dependencies]
 ndarray = { version = "0.16", optional = true }

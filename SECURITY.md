@@ -14,7 +14,7 @@ Do **not** open a public GitHub issue for security vulnerabilities.
 Instead, use one of the following methods:
 
 - **GitHub Security Advisories:** Open a private advisory at
-  <https://github.com/robertelee78/coreml/security/advisories/new>
+  <https://github.com/robertelee78/coreml-native/security/advisories/new>
 - **Email:** Contact the maintainers directly at the email address listed in
   the repository profile.
 
