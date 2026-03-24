@@ -14,6 +14,11 @@ exclude = [".claude/", ".claude-flow/", "_bmad/", "_bmad-output/", "docs/", "scr
 homepage = "https://github.com/robertelee78/coreml-native"
 readme = "README.md"
 
+[package.metadata.docs.rs]
+default-target = "aarch64-apple-darwin"
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
+all-features = true
+
 [dependencies]
 ndarray = { version = "0.16", optional = true }
 
